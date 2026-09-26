@@ -93,11 +93,8 @@ weblens version
 weblens doctor
 ```
 
-Running `weblens doctor` (text mode) also makes sure an WebLens skill
-exists in detected agent skill directories. If the user already has a skill
-there, doctor preserves it instead of overwriting local customizations. Use
-`weblens skill --install` when you explicitly want to refresh the bundled
-skill files.
+`weblens doctor` only reports status; it does not install or modify skill
+files. Run `weblens skill --install` to refresh the bundled skill files.
 
 Check the doctor output:
 

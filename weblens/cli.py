@@ -265,7 +265,7 @@ def _cmd_install(args):
     import os
 
     from weblens.config import Config
-    from weblens.doctor import check_all, format_report
+    from weblens.doctor import check_all, format_report, print_report
 
     safe_mode = getattr(args, "safe", False) or not getattr(args, "system", False)
     dry_run = args.dry_run
@@ -434,7 +434,7 @@ def _cmd_install(args):
 
         # Final status
         print()
-        print(format_report(results))
+        print_report(format_report(results))
         print()
 
         if safe_mode:
@@ -1283,12 +1283,16 @@ def _install_mcporter():
             configured_server_names,
         )
 
+        # Run from HOME so a project-local ./config/mcporter.json in the current
+        # directory is not mistaken for the user's home-scope configuration.
+        home_dir = os.path.expanduser("~")
         r = subprocess.run(
             [mcporter_cmd, "config", "list", "--json"],
             capture_output=True,
             encoding="utf-8",
             errors="replace",
             timeout=5,
+            cwd=home_dir,
         )
         if r.returncode != 0:
             raise McporterConfigError("mcporter config query failed")
@@ -1305,6 +1309,7 @@ def _install_mcporter():
                     "home",
                 ],
                 capture_output=True, encoding="utf-8", errors="replace", timeout=10,
+                cwd=home_dir,
             )
             if add_result.returncode == 0:
                 print("  ✅ Exa search configured (free, no API key needed)")
@@ -2021,7 +2026,7 @@ def _cmd_uninstall(args):
 
 def _cmd_doctor(args=None):
     from weblens.config import Config
-    from weblens.doctor import check_all, format_report
+    from weblens.doctor import check_all, format_report, print_report
     config = Config(read_only=True)
     results = check_all(config)
 
@@ -2029,13 +2034,7 @@ def _cmd_doctor(args=None):
         print(json.dumps(results, ensure_ascii=False, indent=2))
         return
 
-    report = format_report(results)
-    try:
-        from rich import print as rich_print
-    except ImportError:
-        print(report)
-    else:
-        rich_print(report)
+    print_report(format_report(results))
 
 
 def _cmd_setup():

@@ -129,3 +129,14 @@ def format_report(results: Dict[str, dict]) -> str:
             pass
 
     return "\n".join(lines)
+
+
+def print_report(report: str) -> None:
+    """Print a doctor report, rendering its rich markup when rich is available."""
+    try:
+        from rich import print as rich_print
+    except ImportError:
+        import re
+        print(re.sub(r"\[/?[a-z ]+\]", "", report))
+    else:
+        rich_print(report)

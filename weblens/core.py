@@ -7,12 +7,12 @@ WebLens helps AI agents install and configure upstream platform tools
 call the upstream tools directly — no wrapper layer needed.
 
 Usage:
-    from weblens.doctor import check_all, format_report
+    from weblens.doctor import check_all, format_report, print_report
     from weblens.config import Config
 
     config = Config()
     results = check_all(config)
-    print(format_report(results))
+    print_report(format_report(results))
 """
 
 from typing import Dict, Optional

@@ -130,12 +130,12 @@ opencli instagram user USERNAME -f yaml        # read a given user's recent post
 
 ## Environment check
 
-> The local Python environment defaults to conda `dl`; if `weblens` is not on PATH, use the
-> `conda run -n dl weblens ...` prefix.
+> If `weblens` is not on PATH, use `python -m weblens.cli ...` with the Python
+> interpreter it was installed into.
 
 ```bash
 # Check available channels and the currently active backend for each platform
-conda run -n dl weblens doctor --json
+weblens doctor --json
 ```
 
 ## OpenCLI adapter discovery
