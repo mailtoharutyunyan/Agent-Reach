@@ -8,6 +8,7 @@ from __future__ import annotations
 import gzip
 import io
 import socket
+import ssl
 import urllib.error
 import urllib.request
 from email.message import Message
@@ -378,6 +379,10 @@ def test_https_pins_the_ip_but_verifies_tls_for_the_hostname(fake_net):
     wrapped = {}
 
     class _Ctx:
+        # Python 3.10/3.11 HTTPSConnection.__init__ reads these from the context.
+        verify_mode = ssl.CERT_REQUIRED
+        check_hostname = True
+
         def wrap_socket(self, sock, server_hostname=None):
             wrapped.update(sock=sock, server_hostname=server_hostname)
             return sock
