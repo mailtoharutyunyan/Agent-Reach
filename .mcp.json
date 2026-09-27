@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "weblens": {
+      "type": "stdio",
+      "command": ".venv/bin/python",
+      "args": [
+        "-m",
+        "weblens.integrations.mcp_server"
+      ],
+      "env": {}
+    }
+  }
+}
