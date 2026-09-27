@@ -13,3 +13,22 @@ build/
 .claude/settings.local.json
 uv.lock
 .venv/
+
+# Build / tool caches
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / local tool state
+.idea/
+.vscode/
+.DS_Store
+# opencode's user-local MCP config (created by the opencode tool)
+opencode.json
+
+# Claude Code per-user settings
+.claude/settings.local.json
+
+# Playwright MCP browser snapshots — local only
+.playwright-mcp/
