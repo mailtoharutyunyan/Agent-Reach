@@ -45,8 +45,8 @@ dependencies = [
 [project.optional-dependencies]
 browser = ["playwright>=1.40"]
 cookies = ["browser-cookie3>=0.19"]
-mcp = ["mcp[cli]>=1.0"]
-all = ["playwright>=1.40", "mcp[cli]>=1.0", "browser-cookie3>=0.19"]
+mcp = ["mcp[cli]>=1.0,<2"]
+all = ["playwright>=1.40", "mcp[cli]>=1.0,<2", "browser-cookie3>=0.19"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.8",
