@@ -3,7 +3,7 @@
 #   pip install -c constraints.txt -e .[dev]
 
 requests==2.32.5
-feedparser==6.0.12
+feedparser==6.0.14
 python-dotenv==1.2.1
 loguru==0.7.3
 PyYAML==6.0.3
