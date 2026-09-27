@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """LinkedIn — check if mcp-server-linkedin is configured."""
 
 import shutil

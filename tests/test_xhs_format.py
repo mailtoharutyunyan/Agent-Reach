@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for XiaoHongShu output formatter (issue #134)."""
 
 import unittest

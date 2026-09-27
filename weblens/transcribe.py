@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Whisper audio transcription with explicit provider routing.
 
 Downloads audio (yt-dlp), compresses + chunks (ffmpeg), and posts to a
@@ -27,7 +26,6 @@ import socket
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -152,7 +150,7 @@ def _require_duration_within_budget(path: Path) -> float:
     return duration
 
 
-def _run(cmd: List[str], timeout: int = 600) -> None:
+def _run(cmd: list[str], timeout: int = 600) -> None:
     """Run a subprocess, raising TranscribeError on nonzero exit or timeout.
 
     cmd carries user-supplied URLs/paths into yt-dlp/ffmpeg — a stalled
@@ -167,7 +165,7 @@ def _run(cmd: List[str], timeout: int = 600) -> None:
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        raise TranscribeError(f"{cmd[0]} timed out after {timeout}s")
+        raise TranscribeError(f"{cmd[0]} timed out after {timeout}s") from None
     if proc.returncode != 0:
         raise TranscribeError(
             f"{cmd[0]} failed (exit {proc.returncode}): {proc.stderr.strip()[:300]}"
@@ -199,6 +197,14 @@ def _is_private_ip(value: str) -> bool:
     ip = _literal_ip(value)
     if ip is None:
         return False
+    return _is_non_public_address(ip)
+
+
+def _is_non_public_address(ip) -> bool:
+    # IPv4-mapped IPv6 (::ffff:127.0.0.1) must be judged by its IPv4 form.
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
     return any(
         (
             ip.is_private,
@@ -211,8 +217,47 @@ def _is_private_ip(value: str) -> bool:
     )
 
 
+def _assert_resolves_to_public(host: str) -> None:
+    """Resolve ``host`` and reject it if ANY address is non-public.
+
+    Checking every address (not just the first) stops a name that publishes
+    both a public and an internal record from sneaking through. Resolution
+    failure fails closed.
+    """
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (OSError, UnicodeError):
+        raise TranscribeError(
+            "SSRF blocked: URL host could not be resolved"
+        ) from None
+    if not infos:
+        raise TranscribeError("SSRF blocked: URL host could not be resolved")
+    for info in infos:
+        address = str(info[4][0]).split("%", 1)[0]  # drop IPv6 zone id
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            raise TranscribeError(
+                "SSRF blocked: URL host resolved to an invalid address"
+            ) from None
+        if _is_non_public_address(ip):
+            raise TranscribeError(
+                "SSRF blocked: URL host resolves to a private/internal IP"
+            )
+
+
 def _assert_safe_public_url(url: str) -> None:
-    """Reject literal local/internal URLs without DNS-resolving public hosts."""
+    """Reject URLs whose host is, or resolves to, a local/internal address.
+
+    Residual risk (documented, not fully preventable here): yt-dlp performs
+    the actual fetch and resolves the name again, and it follows HTTP
+    redirects and extractor-driven secondary requests (CDN/manifest URLs) that
+    this pre-flight check never sees. yt-dlp exposes no option to pin a
+    resolved address or restrict redirects to the validated host, so a
+    DNS-rebinding host or an open redirect on a public site can still steer a
+    request inward. Run transcription in a network namespace without access to
+    internal services when that matters.
+    """
     if "://" not in url:
         before_slash = url.split("/", 1)[0]
         if ":" in before_slash:
@@ -243,8 +288,12 @@ def _assert_safe_public_url(url: str) -> None:
         raise TranscribeError("SSRF blocked: URL host is invalid") from None
     if host in _BLOCKED_HOSTS or host.endswith(".localhost"):
         raise TranscribeError("SSRF blocked: internal host is not allowed")
-    if _is_private_ip(host):
-        raise TranscribeError("SSRF blocked: private/internal IP is not allowed")
+    if _literal_ip(host) is not None:
+        # Literal addresses are judged directly — no DNS lookup needed.
+        if _is_private_ip(host):
+            raise TranscribeError("SSRF blocked: private/internal IP is not allowed")
+        return
+    _assert_resolves_to_public(host)
 
 
 def download_audio(url: str, out_dir: Path) -> Path:
@@ -308,7 +357,7 @@ def compress_audio(src: Path, out_dir: Path) -> Path:
     return dst
 
 
-def chunk_audio(src: Path, out_dir: Path, segment_seconds: int = CHUNK_SECONDS) -> List[Path]:
+def chunk_audio(src: Path, out_dir: Path, segment_seconds: int = CHUNK_SECONDS) -> list[Path]:
     """Split src into segments. Re-encodes each segment so cuts align to keyframes."""
     if segment_seconds <= 0:
         raise TranscribeError("chunk segment duration must be positive")
@@ -352,7 +401,7 @@ def chunk_audio(src: Path, out_dir: Path, segment_seconds: int = CHUNK_SECONDS) 
     return chunks
 
 
-def _provider_key(provider: str, config: Config) -> Optional[str]:
+def _provider_key(provider: str, config: Config) -> str | None:
     field = PROVIDERS[provider]["key_field"]
     val = config.get(field)
     return val or None
@@ -362,7 +411,7 @@ def transcribe_chunk(
     chunk: Path,
     provider: str,
     *,
-    config: Optional[Config] = None,
+    config: Config | None = None,
     timeout: int = 120,
 ) -> str:
     """Transcribe one chunk via the named provider. Raises TranscribeError on failure."""
@@ -394,7 +443,7 @@ def transcribe_chunk(
     return resp.text
 
 
-def _provider_order(provider: str) -> List[str]:
+def _provider_order(provider: str) -> list[str]:
     if provider == "auto":
         return ["groq", "openai"]
     if provider in PROVIDERS:
@@ -406,8 +455,8 @@ def transcribe(
     source: str,
     *,
     provider: str = "auto",
-    out_dir: Optional[Path] = None,
-    config: Optional[Config] = None,
+    out_dir: Path | None = None,
+    config: Config | None = None,
     allow_provider_fallback: bool = False,
 ) -> str:
     """Transcribe a URL or local file path. Returns the joined transcript text.
@@ -442,7 +491,7 @@ def transcribe(
         return _transcribe_in_dir(source, order, cfg, Path(tmp))
 
 
-def _transcribe_in_dir(source: str, order: List[str], cfg: Config, work_dir: Path) -> str:
+def _transcribe_in_dir(source: str, order: list[str], cfg: Config, work_dir: Path) -> str:
     work_dir.mkdir(parents=True, exist_ok=True)
 
     src_path = Path(source)
@@ -477,16 +526,16 @@ def _transcribe_in_dir(source: str, order: List[str], cfg: Config, work_dir: Pat
             f"safety limit is {limit_mib:g} MiB"
         )
 
-    pieces: List[str] = []
+    pieces: list[str] = []
     for chunk in chunks:
         text = _transcribe_with_fallback(chunk, order, cfg)
         pieces.append(text.strip())
     return "\n".join(p for p in pieces if p)
 
 
-def _transcribe_with_fallback(chunk: Path, order: List[str], config: Config) -> str:
+def _transcribe_with_fallback(chunk: Path, order: list[str], config: Config) -> str:
     """Try each provider in order; return first success or raise the last error."""
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for p in order:
         if not _provider_key(p, config):
             # Skip silently — caller already validated at least one is configured.

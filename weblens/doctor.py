@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """Environment health checker — powered by channels.
 
 Each channel knows how to check itself. Doctor just collects the results.
 """
 
-from typing import Dict
 
 from rich.markup import escape
 
@@ -13,7 +11,7 @@ from weblens.config import Config
 from weblens.utils.text import scrub_url_credentials
 
 
-def check_all(config: Config) -> Dict[str, dict]:
+def check_all(config: Config) -> dict[str, dict]:
     """Check all channels and return status dict.
 
     A single misbehaving channel must never take the whole report down,
@@ -54,7 +52,7 @@ def _name_msg(r: dict, escape) -> str:
     return text
 
 
-def format_report(results: Dict[str, dict]) -> str:
+def format_report(results: dict[str, dict]) -> str:
     """Format results as a readable text report (with Rich markup)."""
     lines = []
     lines.append("[bold cyan]WebLens Status[/bold cyan]")
@@ -67,7 +65,7 @@ def format_report(results: Dict[str, dict]) -> str:
     # Tier 0 — zero config
     lines.append("")
     lines.append("[bold]✅ Ready to use:[/bold]")
-    for key, r in results.items():
+    for _key, r in results.items():
         if r["tier"] == 0:
             name_msg = _name_msg(r, escape)
             if r["status"] == "ok":
@@ -84,7 +82,7 @@ def format_report(results: Dict[str, dict]) -> str:
     if tier1_active:
         lines.append("")
         lines.append("[bold]Optional channels (installed):[/bold]")
-        for key, r in tier1_active.items():
+        for _key, r in tier1_active.items():
             lines.append(f"  [green]✅[/green] {_name_msg(r, escape)}")
 
     # Tier 2 — optional complex setup
@@ -95,7 +93,7 @@ def format_report(results: Dict[str, dict]) -> str:
         if not tier1_active:
             lines.append("")
             lines.append("[bold]Optional channels (installed):[/bold]")
-        for key, r in tier2_active.items():
+        for _key, r in tier2_active.items():
             lines.append(f"  [green]✅[/green] {_name_msg(r, escape)}")
 
     lines.append("")

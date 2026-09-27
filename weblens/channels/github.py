@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """GitHub — check if gh CLI is available."""
 
 from __future__ import annotations

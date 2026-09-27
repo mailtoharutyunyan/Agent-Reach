@@ -12,7 +12,8 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from weblens.cli import _cmd_uninstall, _install_skill, _uninstall_skill
+from weblens.commands.skill import _install_skill, _uninstall_skill
+from weblens.commands.uninstall import _cmd_uninstall
 
 
 def _frontmatter(resource_name: str) -> dict[str, object]:
@@ -58,7 +59,7 @@ def test_install_skill_discovers_opencode_global_directory(tmp_path: Path):
     skill_parent.mkdir(parents=True)
 
     with patch(
-        "weblens.cli.os.path.expanduser",
+        "weblens.commands.skill.os.path.expanduser",
         side_effect=lambda value: value.replace("~", os.fspath(tmp_path)),
     ), patch.dict(os.environ, {}, clear=True):
         _install_skill()
@@ -74,7 +75,7 @@ def test_uninstall_skill_removes_opencode_global_directory(tmp_path: Path):
     (installed / "SKILL.md").write_text("test", encoding="utf-8")
 
     with patch(
-        "weblens.cli.os.path.expanduser",
+        "weblens.commands.skill.os.path.expanduser",
         side_effect=lambda value: value.replace("~", os.fspath(tmp_path)),
     ), patch.dict(os.environ, {}, clear=True):
         _uninstall_skill()
@@ -89,7 +90,7 @@ def test_full_uninstall_includes_opencode_directory(
     installed.mkdir(parents=True)
 
     with patch(
-        "weblens.cli.os.path.expanduser",
+        "weblens.commands.uninstall.os.path.expanduser",
         side_effect=lambda value: os.fspath(
             tmp_path / value.removeprefix("~/")
         )

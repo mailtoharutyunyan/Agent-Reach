@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for the ``xueqiu`` (Xueqiu / Snowball) channel.
 
 Xueqiu wraps several public JSON endpoints and does real shaping of the

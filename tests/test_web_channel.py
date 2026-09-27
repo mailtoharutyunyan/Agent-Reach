@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for the ``web`` channel.
 
 ``web`` is the tier-0 catch-all: ``can_handle`` must accept *anything* so it
@@ -91,7 +90,7 @@ def test_read_sends_expected_headers_and_timeout():
 
 def test_read_decodes_utf8_body():
     channel = WebChannel()
-    with patch("urllib.request.urlopen", return_value=_resp("café ☕\n".encode("utf-8"))):
+    with patch("urllib.request.urlopen", return_value=_resp("café ☕\n".encode())):
         out = channel.read("https://example.com")
     assert out == "café ☕\n"
 

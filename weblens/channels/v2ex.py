@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """V2EX — public API channel for topics, nodes, users, and replies."""
 
 import json
@@ -12,6 +11,7 @@ from urllib.parse import quote, urlencode, urlsplit
 from weblens.utils.process import utf8_subprocess_env
 from weblens.utils.text import scrub_url_credentials
 
+from . import _http
 from .base import Channel
 
 _UA = "weblens/1.0"
@@ -47,7 +47,7 @@ def _get_json_with_urllib(url: str) -> Any:
     """Fetch JSON with Python's standard HTTP stack."""
     _validate_api_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+    with _http.urlopen(req, timeout=_TIMEOUT) as resp:  # honors the saved proxy
         raw = resp.read(_MAX_RESPONSE_BYTES + 1)
     if len(raw) > _MAX_RESPONSE_BYTES:
         raise ValueError("V2EX API response exceeds the 1 MiB safety limit")
@@ -114,7 +114,7 @@ def _get_json_with_curl(url: str) -> Any:
             encoding="utf-8",
             errors="replace",
             timeout=_TIMEOUT + 2,
-            env=utf8_subprocess_env(),
+            env={**utf8_subprocess_env(), **_http.proxy_env()},
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError("curl could not complete the V2EX TLS fallback") from exc

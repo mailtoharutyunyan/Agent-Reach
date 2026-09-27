@@ -7,6 +7,7 @@
 #           (Whisper's support for Chinese punctuation is weak; enabling this makes the transcript much easier to read)
 
 set -e
+set -o pipefail
 
 POLISH=0
 while [ $# -gt 0 ]; do
@@ -80,6 +81,17 @@ if [ -z "$GROQ_API_KEY" ]; then
     fi
 fi
 GROQ_API_KEY="${GROQ_API_KEY:?Please set the GROQ_API_KEY environment variable or run weblens configure groq-key}"
+case "$GROQ_API_KEY" in
+    *$'\n'*|*$'\r'*)
+        echo "❌ GROQ_API_KEY must not contain line breaks" >&2
+        exit 1 ;;
+esac
+
+# Strip C0/C1 control characters and Unicode format characters (bidi
+# overrides etc.) from untrusted page text before it reaches the terminal.
+sanitize_for_terminal() {
+    LC_ALL=C perl -pe 's/[\x00-\x08\x0b-\x1f\x7f]//g; s/\xc2[\x80-\x9f]//g; s/\xe2\x80[\x8b-\x8f\xaa-\xae]//g; s/\xe2\x81[\xa6-\xa9]//g'
+}
 
 # Groq API limit: 25MB per file
 MAX_CHUNK_SIZE_MB=20
@@ -104,6 +116,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Keep the API key off curl's command line (visible in `ps`): write the header
+# with the printf builtin into a 0600 file inside the 0700 work dir and pass it
+# via `-H @file`.
+AUTH_HEADER_FILE="$WORK_DIR/groq_auth_header"
+(umask 077 && printf 'Authorization: Bearer %s\n' "$GROQ_API_KEY" > "$AUTH_HEADER_FILE")
+
 echo "📻 Xiaoyuzhou podcast transcription"
 echo "===================="
 
@@ -114,8 +132,11 @@ PAGE=$(curl --fail --show-error --location --silent \
     --max-time "$PAGE_TIMEOUT" \
     --max-filesize "$MAX_PAGE_BYTES" \
     "$URL")
-AUDIO_URL=$(echo "$PAGE" | perl -ne 'while (/(https:\/\/media\.xyzcdn\.net\/[^"]*\.(?:m4a|mp3))/gi) { print "$1\n" }' | head -1)
-TITLE=$(echo "$PAGE" | perl -ne 'if (/"title":"([^"]*)"/) { print "$1\n"; last }' | head -1)
+# Feed perl via here-strings (not `echo | perl ... | head -1`): an early exit on
+# either side of a pipe would SIGPIPE the other and abort under pipefail.
+AUDIO_URL=$(perl -ne 'if (/(https:\/\/media\.xyzcdn\.net\/[^"\s]*\.(?:m4a|mp3))/i) { print "$1\n"; exit }' <<< "$PAGE")
+TITLE=$(perl -ne 'if (/"title":"([^"]*)"/) { print "$1\n"; exit }' <<< "$PAGE")
+TITLE=$(sanitize_for_terminal <<< "$TITLE")
 
 if [ -z "$AUDIO_URL" ]; then
     echo "❌ Could not extract audio link from page"
@@ -123,7 +144,7 @@ if [ -z "$AUDIO_URL" ]; then
 fi
 
 echo "📝 Title: $TITLE"
-echo "🔗 Audio: $AUDIO_URL"
+echo "🔗 Audio: $(sanitize_for_terminal <<< "$AUDIO_URL")"
 
 # Step 2: Download audio
 echo "⬇️  Downloading audio..."
@@ -215,7 +236,7 @@ for i in $(seq 0 $((NUM_CHUNKS - 1))); do
         --max-filesize "$MAX_API_RESPONSE_BYTES" \
         -w "\n%{http_code}" \
         https://api.groq.com/openai/v1/audio/transcriptions \
-        -H "Authorization: Bearer $GROQ_API_KEY" \
+        -H "@$AUTH_HEADER_FILE" \
         -F file="@$WORK_DIR/chunk_${i}.mp3" \
         -F model="whisper-large-v3" \
         -F language="zh" \
@@ -226,12 +247,12 @@ for i in $(seq 0 $((NUM_CHUNKS - 1))); do
     
     if [ "$HTTP_CODE" != "200" ]; then
         echo "❌ API error (HTTP $HTTP_CODE)"
-        echo "$BODY"
+        sanitize_for_terminal <<< "$BODY"
         
         # If rate limited, wait and retry
         if [ "$HTTP_CODE" = "429" ]; then
             # Extract the wait time from the error message; default 120 seconds
-            WAIT_SEC=$(echo "$BODY" | perl -ne 'if (/in (\d+)m/) { print "$1\n"; exit }')
+            WAIT_SEC=$(perl -ne 'if (/in (\d+)m/) { print "$1\n"; exit }' <<< "$BODY")
             WAIT_SEC=${WAIT_SEC:-2}
             WAIT_SEC=$((WAIT_SEC * 60 + 30))
             if [ "$WAIT_SEC" -gt 900 ]; then
@@ -245,7 +266,7 @@ for i in $(seq 0 $((NUM_CHUNKS - 1))); do
                 --max-filesize "$MAX_API_RESPONSE_BYTES" \
                 -w "\n%{http_code}" \
                 https://api.groq.com/openai/v1/audio/transcriptions \
-                -H "Authorization: Bearer $GROQ_API_KEY" \
+                -H "@$AUTH_HEADER_FILE" \
                 -F file="@$WORK_DIR/chunk_${i}.mp3" \
                 -F model="whisper-large-v3" \
                 -F language="zh" \

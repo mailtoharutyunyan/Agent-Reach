@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Reddit — multi-backend: OpenCLI / rdt-cli. Login is mandatory.
 
 Honest tiering (live-verified 2026-06): there is NO zero-config path.

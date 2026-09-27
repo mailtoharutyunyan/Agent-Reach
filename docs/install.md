@@ -20,7 +20,12 @@ Install WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weble
 
 ### Goal
 
-Install WebLens and all upstream tools so your user's agent has full internet access. After installation, you'll use the upstream tools directly (OpenCLI, twitter-cli, bili-cli, rdt-cli, yt-dlp, mcporter, gh CLI, etc.) — WebLens is the selector, installer, health checker and router, never a wrapper.
+Install WebLens and the upstream tools the user wants, so their agent can read and search the internet. After installation:
+
+- Use `weblens read 'URL'` and `weblens search 'query'` for most requests. They route to the best backend (Hacker News, Wikipedia, arXiv, Stack Overflow, YouTube, GitHub, RSS, Reddit, Twitter/X, any web page) and report fallbacks in their notes.
+- Use the upstream tools directly (OpenCLI, twitter-cli, bili-cli, rdt-cli, yt-dlp, mcporter, gh CLI, etc.) for everything else. The installed skill file lists the commands.
+
+WebLens selects, installs, health-checks and routes these backends.
 
 ### ⚠️ Boundaries
 
@@ -39,18 +44,21 @@ All WebLens files go in dedicated directories — **never in the agent workspace
 
 | Purpose | Directory | Example |
 |---------|-----------|---------|
-| Config & tokens | `~/.weblens/` | `~/.weblens/config.json` |
+| Config & tokens | `~/.weblens/` | `~/.weblens/config.yaml` |
 | Upstream tool repos | `~/.weblens/tools/` | `~/.weblens/tools/xiaoyuzhou/` |
 | Temporary files | `/tmp/` | `/tmp/yt-dlp-output/` |
-| Skills | `~/.openclaw/skills/weblens/` | SKILL.md |
+| Skills | `~/.claude/skills/weblens/`, `~/.openclaw/skills/weblens/`, … | SKILL.md |
 
 **Why?** If you clone repos or create files in the workspace, it pollutes the user's project directory and can break their agent over time. Keep the workspace clean.
 
 ### Step 1: Install the basics
 
 ```bash
-# Recommended: pipx (least hassle)
-pipx install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
+# Recommended: pipx (isolated, least hassle). The PyPI package is named `weblens`.
+pipx install weblens
+# If PyPI does not have it yet (or you want the latest main branch), install from GitHub:
+#   pipx install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
+
 weblens install --env=auto               # Read-only check (default)
 # After the user explicitly approves system changes:
 weblens install --env=auto --system
@@ -59,10 +67,17 @@ weblens install --env=auto --system
 # install in a virtual environment:
 python3 -m venv ~/.weblens-venv
 source ~/.weblens-venv/bin/activate
-pip install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
+pip install weblens     # or: pip install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
 weblens install --env=auto               # Read-only check (default)
 # After the user explicitly approves system changes:
 weblens install --env=auto --system
+```
+
+Smoke test (no setup needed):
+
+```bash
+weblens read 'https://en.wikipedia.org/wiki/Web_browser' --max-chars 500
+weblens search 'web browser engines' --source hackernews --limit 3
 ```
 
 > 💡 **Windows / Microsoft Store Python alias?**
@@ -74,13 +89,15 @@ weblens install --env=auto --system
 > ```powershell
 > py -3 -m venv $env:USERPROFILE\.weblens-venv
 > $env:USERPROFILE\.weblens-venv\Scripts\Activate.ps1
-> python -m pip install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
+> python -m pip install weblens
 > weblens install --env=auto
 > ```
 
-The default command checks core infrastructure (gh CLI, Node.js, mcporter, Exa search, yt-dlp config) without changing the host. With explicit `--system` approval it installs/configures the missing pieces and activates these zero-config channels:
+The default command checks core infrastructure (gh CLI, Node.js, mcporter, Exa search, yt-dlp config) without changing the host. With explicit `--system` approval it installs/configures the missing pieces (at pinned versions) and registers the skill file.
 
-- Web (Jina Reader), YouTube, GitHub, RSS, Exa Search, V2EX, Bilibili (basic)
+These channels need no account or key:
+
+- Web (Jina Reader), Web search (Exa, once mcporter is configured), YouTube, GitHub (public API; `gh auth login` raises limits), Hacker News, Wikipedia, arXiv, Stack Overflow, RSS, V2EX, Bilibili (basic)
 
 > 💡 **macOS / Homebrew Python says `externally-managed-environment`?**
 > This is PEP 668 protection, not a problem with WebLens itself. Prefer `pipx install ...`, or create a `venv` first and install into it.
@@ -98,7 +115,7 @@ weblens install --env=auto --dry-run   # Preview what --system would do
 
 After installing the basics, **ask the user** which additional channels they need. Present this list:
 
-> The basic channels are installed! You can now ask me to search the web, watch YouTube, read GitHub, and more.
+> The basic channels are installed! You can now ask me to read any link, search the web, Hacker News, Wikipedia, arXiv and Stack Overflow, summarize YouTube videos, read GitHub, and more.
 >
 > These optional channels are also available. Which ones do you need?
 >
@@ -127,14 +144,6 @@ weblens install --env=auto --system --channels=all                   # User appr
 
 Supported channel names: `opencli`, `twitter`, `xiaoyuzhou`, `xueqiu`, `xiaohongshu`, `reddit`, `facebook`, `instagram`, `bilibili`, `linkedin`, `boss`, `all`
 
-### Step 3: Fix what's broken
-
-Run `weblens doctor` and check the output.
-
-Try to get as many channels to ✅ as possible. If something failed during install or shows as ❌/⚠️ in doctor, diagnose the problem and try to fix it — but stay within the boundaries above. If a fix requires elevated permissions or system changes, ask the user first.
-
-Only ask the user when you genuinely need their input (credentials, permissions, etc.).
-
 ### Step 3: Configure things that need user input
 
 Some channels need credentials only the user can provide. Based on the doctor output, ask for what's missing:
@@ -161,13 +170,14 @@ weblens configure twitter-cookies
 ```
 
 This saves `twitter_auth_token` and `twitter_ct0` for WebLens's own
-`doctor` configuration check. `doctor` does not run the upstream `twitter status` in real time and does not modify
+`doctor` configuration check; `weblens read` / `weblens search` also pass them to the
+twitter-cli child process. `doctor` does not run the upstream `twitter status` in real time and does not modify
 the current shell. Before running `twitter search/read/...` directly, you must explicitly set these in that process's environment:
 
 ```bash
 export TWITTER_AUTH_TOKEN="..."
 export TWITTER_CT0="..."
-twitter search "query" -n 10
+twitter search 'query' -n 10
 ```
 
 > **Proxy notes (for networks that need to bypass the firewall, such as mainland China):**
@@ -176,8 +186,10 @@ twitter search "query" -n 10
 >
 > **What you (the Agent) need to do:**
 > 1. Confirm the user has configured a proxy: `weblens configure proxy` (hidden input)
-> 2. Set the environment variables: `export HTTP_PROXY="..." HTTPS_PROXY="..."`
-> 3. WebLens handles the rest automatically; the user does not need to do anything else
+> 2. `weblens read` / `weblens search` then use it automatically, including for the upstream tools they run.
+>    When you call twitter-cli, rdt-cli or other tools directly, set the environment variables yourself:
+>    `export HTTP_PROXY="..." HTTPS_PROXY="..."` (environment variables always take precedence over the saved proxy)
+> 3. The user does not need to do anything else
 >
 > If the user reports "fetch failed", see [troubleshooting.md](troubleshooting.md)
 
@@ -247,10 +259,10 @@ weblens install --system --channels facebook,instagram
 > 2. Log in to facebook.com / instagram.com in Chrome
 > 3. The Agent calls it directly:
 >    ```bash
->    opencli facebook search "query" -f yaml
+>    opencli facebook search 'query' -f yaml
 >    opencli facebook profile zuck -f yaml
 >    opencli facebook groups -f yaml
->    opencli instagram search "query" -f yaml     # user search
+>    opencli instagram search 'query' -f yaml     # user search
 >    opencli instagram profile nasa -f yaml
 >    opencli instagram user nasa -f yaml          # a specific user's recent posts
 >    ```
@@ -284,7 +296,7 @@ weblens configure groq-key
 > **How to use:**
 > The user sends a Xiaoyuzhou link to the Agent, and the Agent automatically calls:
 > ```bash
-> bash ~/.weblens/tools/xiaoyuzhou/transcribe.sh https://www.xiaoyuzhoufm.com/episode/xxxxx
+> bash ~/.weblens/tools/xiaoyuzhou/transcribe.sh 'https://www.xiaoyuzhoufm.com/episode/xxxxx'
 > ```
 >
 > Automatically downloads the audio → transcodes and splits it → transcribes with Groq Whisper → outputs a full Chinese transcript.
@@ -330,12 +342,12 @@ When the user says "Set up BOSS Zhipin for me", the Agent completes the parts th
    # macOS
    open -na "Google Chrome" --args --remote-debugging-address=127.0.0.1 \
      --remote-debugging-port=9222 --user-data-dir="$HOME/.boss-chrome-profile" \
-     "https://www.zhipin.com/web/geek/job"
+     'https://www.zhipin.com/web/geek/job'
 
    # Linux
    google-chrome --remote-debugging-address=127.0.0.1 \
      --remote-debugging-port=9222 --user-data-dir="$HOME/.boss-chrome-profile" \
-     "https://www.zhipin.com/web/geek/job"
+     'https://www.zhipin.com/web/geek/job'
    ```
    Windows PowerShell:
    ```powershell
@@ -362,9 +374,13 @@ When the user says "Set up BOSS Zhipin for me", the Agent completes the parts th
 > `browser_source="existing-browser"` (strict CDP), `JobItem.lid`, and `job_card_browser()`. Once upstream publishes a stable release,
 > WebLens should switch to a version constraint.
 
-### Step 4: Final check
+### Step 4: Fix what's broken and report
 
-Run `weblens doctor` one final time and report the results to your user.
+Run `weblens doctor` and check the output.
+
+Try to get as many channels to ✅ as possible. If something failed during install or shows as ❌/⚠️ in doctor, diagnose the problem and try to fix it (see [troubleshooting.md](troubleshooting.md)) — but stay within the boundaries above. If a fix requires elevated permissions or system changes, ask the user first. Only ask the user when you genuinely need their input (credentials, permissions, etc.).
+
+Then report the final `weblens doctor` results to your user.
 
 ### Step 5: Set up daily monitoring (OpenClaw only)
 
@@ -389,6 +405,8 @@ If the user wants a different agent to handle it, let them choose.
 
 | Command | What it does |
 |---------|-------------|
+| `weblens read 'URL'` | Read any public URL as clean text (`--json`, `--max-chars N`) |
+| `weblens search 'query' [-s SOURCE] [-n N]` | Search web / hackernews / wikipedia / arxiv / stackoverflow / youtube / github / v2ex / reddit / twitter / all |
 | `weblens install --env=auto` | Read-only dependency and channel check (default) |
 | `weblens install --env=auto --system` | Explicitly install/configure core external tools |
 | `weblens install --env=auto --system --channels=twitter,xiaohongshu` | Install approved optional channels |
@@ -400,24 +418,24 @@ If the user wants a different agent to handle it, let them choose.
 | `weblens watch` | Quick health + update check (for scheduled tasks) |
 | `weblens check-update` | Check for new versions |
 | `weblens configure twitter-cookies` | Saves Twitter cookies via hidden input; direct calls still need explicit environment variables |
-| `weblens configure proxy` | Saves the proxy address via hidden input; not an automatic unlock switch |
+| `weblens configure proxy` | Saves the proxy address via hidden input; `weblens read`/`search` and the tools they run use it unless `HTTP(S)_PROXY` is set in the environment |
 | `weblens configure groq-key` | Configures the Xiaoyuzhou transcription key via hidden input |
 
-After installation, use upstream tools directly. See SKILL.md for the full command reference:
+For anything `weblens read` / `weblens search` do not cover, use the upstream tools directly. See SKILL.md for the full command reference:
 
 | Platform | Upstream Tool | Example |
 |----------|--------------|---------|
-| Twitter/X | `twitter` (fallback `opencli`) | After setting `TWITTER_AUTH_TOKEN` / `TWITTER_CT0`, run `twitter search "query" -n 10` |
-| YouTube | `yt-dlp` | `yt-dlp --dump-json URL` |
-| Bilibili | `bili` (subtitles via `opencli`) | `bili search "query" --type video` / `opencli bilibili subtitle BVxxx` |
-| Reddit | `opencli` (fallback `rdt`) | `opencli reddit search "query" -f yaml` / `rdt read POST_ID` |
-| Facebook | `opencli` | `opencli facebook search "query" -f yaml` |
+| Twitter/X | `twitter` (fallback `opencli`) | After setting `TWITTER_AUTH_TOKEN` / `TWITTER_CT0`, run `twitter search 'query' -n 10` |
+| YouTube | `yt-dlp` | `yt-dlp --dump-json 'URL'` |
+| Bilibili | `bili` (subtitles via `opencli`) | `bili search 'query' --type video` / `opencli bilibili subtitle BVxxx` |
+| Reddit | `opencli` (fallback `rdt`) | `opencli reddit search 'query' -f yaml` / `rdt read POST_ID` |
+| Facebook | `opencli` | `opencli facebook search 'query' -f yaml` |
 | Instagram | `opencli` | `opencli instagram user nasa -f yaml` |
-| GitHub | `gh` | `gh search repos "query"` |
-| Web | `curl` + Jina | `curl -s "https://r.jina.ai/URL"` |
-| Exa Search | `mcporter` | `mcporter call exa.web_search_exa query="..." numResults=5` |
-| Xiaohongshu (RedNote) | `opencli` (servers: `mcporter`) | `opencli xiaohongshu search "query" -f yaml` |
-| Xiaoyuzhou podcasts | `transcribe.sh` | `bash ~/.weblens/tools/xiaoyuzhou/transcribe.sh <URL>` |
+| GitHub | `gh` | `gh search repos 'query'` |
+| Web | `curl` + Jina | `curl -s 'https://r.jina.ai/URL'` |
+| Exa Search | `mcporter` | `mcporter call exa.web_search_exa query='...' numResults=5` |
+| Xiaohongshu (RedNote) | `opencli` (servers: `mcporter`) | `opencli xiaohongshu search 'query' -f yaml` |
+| Xiaoyuzhou podcasts | `transcribe.sh` | `bash ~/.weblens/tools/xiaoyuzhou/transcribe.sh 'URL'` |
 | LinkedIn | `mcporter` | `mcporter call linkedin.get_person_profile linkedin_username="..."` |
 | BOSS Zhipin | `boss` / Python public API | `weblens doctor` (browser wt2 probe; `boss status` only reflects the local session.enc); for search and JDs see `references/career.md` |
 | RSS | `feedparser` | `python3 -c "import feedparser; ..."` |

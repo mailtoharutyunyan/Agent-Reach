@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Twitter/X — check if twitter-cli or bird CLI is available."""
 
 import os

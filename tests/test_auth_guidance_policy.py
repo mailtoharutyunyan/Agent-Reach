@@ -131,23 +131,23 @@ def test_localized_readmes_keep_current_bilibili_and_xhs_routes():
 
 
 
-def test_public_guidance_never_installs_the_unrelated_pypi_package():
-    """The PyPI name is owned by another project; GitHub URLs are required."""
+def test_public_guidance_uses_the_weblens_pypi_package():
+    """The PyPI distribution is `weblens` (pyproject name); docs must agree.
+
+    Docs must not warn users away from the PyPI package any more.
+    """
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "pip install weblens" in readme
     candidates = _policy_documents() + [
         ROOT / "weblens" / "integrations" / "mcp_server.py",
     ]
-    bare_install = re.compile(
-        r"\bpip\s+install(?:\s+--upgrade)?\s+['\"]?weblens(?:\[[^\]]+\])?\b",
-        re.IGNORECASE,
-    )
+    stale_warning = re.compile(r"same name from PyPI|not this project", re.IGNORECASE)
     violations = []
     for path in candidates:
         for line_number, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), 1
         ):
-            if bare_install.search(line) and (
-                "github.com/YOUR_GITHUB_USER/weblens" not in line
-            ):
+            if stale_warning.search(line):
                 violations.append(
                     f"{path.relative_to(ROOT)}:{line_number}: {line.strip()}"
                 )

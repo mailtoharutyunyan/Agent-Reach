@@ -1,11 +1,12 @@
 <h1 align="center">👁️ WebLens</h1>
 
 <p align="center">
-  <strong>Give your AI Agent internet access in one step</strong>
+  <strong>One command to read and search the web — for you and your AI agent.</strong>
 </p>
 
 <p align="center">
-  The most reliable access path available right now — chosen, installed, and health-checked for you. Access paths change over time; you don't have to worry about it.
+  <code>weblens read &lt;url&gt;</code> turns any link into clean text. <code>weblens search &lt;query&gt;</code> searches the web, Hacker News, Wikipedia, arXiv, Stack Overflow, GitHub and more.<br>
+  Behind both, WebLens picks, installs and health-checks the best free backend for each platform.
 </p>
 
 <p align="center">
@@ -14,255 +15,363 @@
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> · <a href="#supported-platforms">Platforms</a> · <a href="#design-philosophy">Philosophy</a>
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="#supported-sources">Sources</a> ·
+  <a href="#use-with-ai-agents">AI agents</a> ·
+  <a href="#python-api">Python API</a> ·
+  <a href="#security--privacy">Security</a>
 </p>
 
 ---
 
-## Why WebLens?
+## 30-second demo
 
-AI Agents can already write code, edit documents, and manage projects for you — but ask one to find something online and it's lost:
+```bash
+pip install weblens
+```
 
-- 📺 "What does this YouTube tutorial cover?" → **Can't watch it**, no access to subtitles
-- 🐦 "Search Twitter for what people think of this product" → **Can't search**, the Twitter API is paid
-- 📖 "Check Reddit to see if anyone has hit the same bug" → **403 blocked**, server IP rejected
-- 📕 "Check the reviews for this product on Xiaohongshu (RedNote)" → **Can't open it**, login required
-- 📺 "There's a tech video on Bilibili, summarize it for me" → **Can't fetch it**, generic downloaders are fully blocked by Bilibili's anti-bot controls
-- 🔍 "Search the web for the latest LLM framework comparisons" → **No good search**, either paid or low quality
-- 🌐 "What does this web page say?" → **Returns a pile of HTML tags**, basically unreadable
-- 📦 "What is this GitHub repo for? What's being said in the Issues?" → Works, but auth setup is a hassle
-- 📡 "Subscribe to these RSS feeds and tell me when they update" → You have to install a library and write code yourself
+**Read any URL.** WebLens detects what the link is and uses the platform's own API when one exists:
 
-**None of this is hard, but it all takes fiddly setup**
+```console
+$ weblens read 'https://arxiv.org/abs/1706.03762' --max-chars 300
+# Attention Is All You Need
 
-Every platform has its own barriers — paid APIs, blocks to get around, accounts to log into, data to clean. You'd have to hit every pitfall, install tools, and tweak configs one by one; just getting your Agent to read Twitter can take half a day.
+- source: arxiv via arXiv API
+- url: https://arxiv.org/abs/1706.03762v7
+- id: 1706.03762v7
+- authors: Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, ...
+- published: 2017-06-12T17:57:34Z
+- categories: cs.CL, cs.LG
+- pdf: https://arxiv.org/pdf/1706.03762v7
+- truncated: yes
 
-**WebLens turns this into a single sentence:**
+## Abstract
+
+The dominant sequence transduction models are based on complex recurrent or
+convolutional neural networks in an encoder-decoder configuration. ...
+```
+
+```console
+$ weblens read 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --max-chars 200
+# Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)
+
+- source: youtube via yt-dlp
+- channel: Rick Astley
+- duration: 3:33
+- views: 1,820,177,641
+- subtitles: en (manual)
+...
+```
+
+**Search one source, or several at once:**
+
+```console
+$ weblens search 'rust async runtime' --source all --limit 2
+# Search: "rust async runtime" (source: all)
+
+## web (2)
+1. Tokio - An asynchronous Rust runtime
+   https://tokio.rs/
+   Tokio is an asynchronous runtime for the Rust programming language. ...
+
+## hackernews (2)
+1. The State of Async Rust: Runtimes
+   https://corrode.dev/blog/async/
+   points: 258 · comments: 198 · author: RebootStr · date: 2023-09-25
+
+## wikipedia (2)
+1. Tokio (software)
+   https://en.wikipedia.org/wiki/Tokio_%28software%29
+...
+## stackoverflow (2)
+...
+## arxiv (2)
+...
+```
+
+Add `--json` to either command for structured output that scripts and agents can parse.
+
+---
+
+## Why WebLens
+
+Agents are good at reasoning, but bad at getting to the content:
+
+- A YouTube link has no text to read unless something fetches the transcript.
+- Raw HTML is noisy; most pages need a reader to become usable text.
+- Reddit, X and other social sites block anonymous and server traffic.
+- Every platform has its own CLI, API quirks, login model and rate limits, and they change often.
+
+WebLens handles all of that in one place:
+
+| | |
+|---|---|
+| 🎯 **One interface** | `read` and `search` work the same way on every source, as CLI, Python API or MCP tools. |
+| 🆓 **Free by default** | Ten sources work with no account and no API key. Every backend is open source or a free public API. |
+| 🔀 **Resilient routing** | Each platform has an ordered list of backends. When one breaks, WebLens moves to the next. `weblens doctor` shows which one is active. |
+| 🩺 **Built-in diagnostics** | `weblens doctor` tells you what works, what doesn't, and the exact fix. |
+| 🤖 **Agent-ready** | Ships a skill file for Claude Code, OpenClaw and OpenCode, plus an MCP server for Cursor and other MCP clients. |
+| 🔒 **Local-first** | Credentials stay in `~/.weblens/` on your machine. Private and internal URLs are refused. |
+
+---
+
+## Quick start
+
+### Install it yourself
+
+```bash
+pip install weblens          # the PyPI package is named `weblens`
+# or, isolated:
+pipx install weblens
+
+weblens doctor               # what works right now
+weblens read 'https://news.ycombinator.com/item?id=42231710'
+weblens search 'vector databases' --source hackernews
+```
+
+Latest development version from GitHub:
+
+```bash
+pipx install https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
+```
+
+### Or let your agent do it
+
+Paste this into Claude Code, Cursor, OpenClaw or any agent that can run shell commands:
 
 ```
 Install WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/install.md
 ```
 
-Copy that to your Agent, and a few minutes later it can read Twitter, search Reddit, watch YouTube, and browse Xiaohongshu.
-
-**Already installed? Updating is one sentence too:**
+The agent installs the CLI, checks your environment, registers the skill file, and asks which optional platforms you want. Updating works the same way:
 
 ```
 Update WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/update.md
 ```
 
-> ⭐ **Star this project** — we keep tracking changes on every platform and adding new channels. You don't have to watch for it yourself: when a platform blocks us, we fix it; when there's a new channel, we add it.
+> 🛡️ **Safe by default.** `weblens install` only inspects the machine and lists what is missing. Nothing is installed and no config is written until you pass `--system`. Use `--dry-run` to preview.
 
-### ✅ Before you start, you might want to know
+> ⚠️ **OpenClaw users:** the agent must be allowed to run shell commands. Switch to the `coding` tool profile first (`openclaw config set tools.profile "coding"`), restart the gateway with `openclaw gateway restart`, and start a new conversation.
 
-| | |
+---
+
+## Commands
+
+| Command | What it does |
 |---|---|
-| 💰 **Completely free** | All tools are open source and all APIs are free. The only possible cost is a server proxy ($1/month); local computers don't need one |
-| 🔒 **Privacy safe** | Cookies stay on your machine only — never uploaded or shared. The code is fully open source and can be audited anytime |
-| 🔄 **Continuously updated** | Every platform uses multi-backend "primary + fallback" routing. When one access path stops working, we switch to the next and you won't notice (June 2026 example: Bilibili's anti-bot controls blocked yt-dlp completely → switched to bili-cli, zero action required from users) |
-| 🤖 **Works with any Agent** | Claude Code, OpenClaw, Cursor, Windsurf… any Agent that can run command-line tools |
-| 🩺 **Built-in diagnostics** | `weblens doctor` tells you in one command what works, what doesn't, and how to fix it |
+| `weblens read <url> [--json] [--max-chars N]` | Read any public URL as clean text, routed to the best backend |
+| `weblens search <query> [-s SOURCE] [-n N] [--json]` | Search `web` (default), `hackernews`, `wikipedia`, `arxiv`, `stackoverflow`, `youtube`, `github`, `v2ex`, `reddit`, `twitter`, or `all` |
+| `weblens doctor [--json]` | Show every channel's status and active backend |
+| `weblens install [--env local\|server\|auto] [--system] [--dry-run] [--channels LIST]` | Check dependencies; with `--system`, install and configure them |
+| `weblens configure <key>` / `--from-browser BROWSER --platform P` | Save a proxy, token or cookies (hidden prompt or `--stdin`) |
+| `weblens setup` | Interactive configuration wizard |
+| `weblens skill --install` / `--uninstall` | Register or remove the agent skill file |
+| `weblens transcribe <url-or-file> [-o FILE]` | Speech to text via Whisper (Groq or OpenAI key) |
+| `weblens watch` | Quick health and update check, for scheduled tasks |
+| `weblens check-update` | Check for a newer WebLens release |
+| `weblens uninstall [--dry-run] [--keep-config]` | Remove config, tokens and skill files |
+| `weblens version` | Print the version |
+
+Global flags: `-v/--verbose` shows debug logs; `--debug` also prints full tracebacks. Exit codes: `0` success, `1` failure, `2` bad usage (invalid URL, unknown source, bad flag).
+
+`search --source all` queries web, Hacker News, Wikipedia, Stack Overflow and arXiv in parallel and groups the results by source. `--limit` is per source (default 10, max 50). If web search (Exa) is not configured, `search` falls back to Hacker News + Wikipedia and says so.
 
 ---
 
-## Supported Platforms
+## Supported sources
 
-| Platform | Works out of the box | Unlocked after setup | How to set up |
-|------|---------|-----------|-------|
-| 🌐 **Web** | Read any web page | — | No setup needed |
-| 📺 **YouTube** | Subtitle extraction + video search | — | No setup needed |
-| 📡 **RSS** | Read any RSS/Atom feed | — | No setup needed |
-| 🔍 **Web search** | — | Semantic search across the web | Auto-configured (via MCP, free, no key needed) |
-| 📦 **GitHub** | Read public repos + search | Private repos, open Issues/PRs, Fork | Tell your Agent "help me log in to GitHub" |
-| 🐦 **Twitter/X** | Read single tweets | Search tweets, browse timelines, read long-form articles | Tell your Agent "help me set up Twitter" |
-| 📺 **Bilibili** | Search + video details (bili-cli, no login needed) | Subtitles (OpenCLI) | Tell your Agent "help me set up Bilibili" |
-| 📖 **Reddit** | — (no zero-config path: anonymous endpoints are blocked) | Search + read posts and comments | Install OpenCLI on desktop to use your browser login session; or rdt-cli + Cookie |
-| 📘 **Facebook** | — | Search, profiles, Feed, groups list | Install OpenCLI on desktop (reuses your Chrome login session) |
-| 📷 **Instagram** | — | User search, Profile, a user's recent posts, Explore | Install OpenCLI on desktop (reuses your Chrome login session) |
-| 📕 **Xiaohongshu (RedNote)** | — | Search, read, comments | OpenCLI only uses the user's existing Chrome session; MCP/legacy tools use Cookie-Editor |
-| 💼 **LinkedIn** | Read public pages via Jina Reader | Profile details, company pages, job search | Tell your Agent "help me set up LinkedIn" |
-| 🎯 **BOSS Zhipin** | CDP pipeline health check | Job search + full JD text (dedicated real Chrome) | Tell your Agent "set up BOSS Zhipin for me"; the Agent opens a dedicated Chrome and you log in manually |
-| 💻 **V2EX** | Hot topics, node topics, topic details + replies, user info | — | No setup needed |
-| 📈 **Xueqiu (Snowball)** | Stock quotes, stock search, hot posts, hot stock rankings | — | Tell your Agent "help me set up Xueqiu" |
-| 🎙️ **Xiaoyuzhou Podcast** | — | Podcast audio to text (Whisper transcription, free key) | Tell your Agent "help me set up Xiaoyuzhou Podcast" |
+### Global
 
-> **Not sure how to set it up? No need to read the docs.** Just tell your Agent "help me set up XXX" — it knows what's needed and will guide you step by step.
->
-> 🍪 Twitter only accepts content the user exports manually via Cookie-Editor. WebLens does not log in to Xiaohongshu on the user's behalf and does not read Xiaohongshu browser cookies; OpenCLI only uses a Chrome session that already exists and is explicitly controlled by the user. `weblens configure xhs-cookies` does not inject cookies into OpenCLI / Chrome; if there is no existing session, export with Cookie-Editor instead and configure xiaohongshu-mcp / legacy tools.
->
-> Saved Twitter cookies are only used by `weblens doctor` to check whether the configuration is complete; before running the upstream `twitter` command directly, you still need to explicitly set `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` in the current process environment.
->
-> 🔒 Cookies stay on your machine only — never uploaded or shared. The code is fully open source and can be audited anytime.
-> 💻 Local computers don't need a proxy. A proxy is only needed when deploying on a server (~$1/month).
+| Source | `read` | `search` | Backend | Setup |
+|---|---|---|---|---|
+| 🌐 **Any web page** | ✅ | — | [Jina Reader](https://github.com/jina-ai/reader) | None |
+| 🔍 **Web search** | — | ✅ `web` | [Exa](https://exa.ai) via [mcporter](https://github.com/nicobailon/mcporter) | None (free MCP endpoint, added by `install --system`) |
+| 📺 **YouTube** | ✅ metadata + transcript | ✅ `youtube` | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | None |
+| 📦 **GitHub** | ✅ repo README, issue, PR | ✅ `github` | [gh CLI](https://cli.github.com) or public REST API | None; `gh auth login` lifts the 60 req/h limit |
+| 🟧 **Hacker News** | ✅ story + comment tree | ✅ `hackernews` | HN Firebase API + Algolia | None |
+| 📚 **Wikipedia** | ✅ full article | ✅ `wikipedia` | Wikipedia REST + MediaWiki API | None |
+| 📄 **arXiv** | ✅ abstract + metadata | ✅ `arxiv` | arXiv API | None |
+| 💬 **Stack Overflow** | ✅ question + answers | ✅ `stackoverflow` | Stack Exchange API | None |
+| 📡 **RSS / Atom** | ✅ | — | [feedparser](https://github.com/kurtmckee/feedparser) | None |
+| 📖 **Reddit** | ✅ via backend | ✅ `reddit` | [OpenCLI](https://github.com/jackwener/opencli) ▸ [rdt-cli](https://github.com/public-clis/rdt-cli) | Login session required |
+| 🐦 **Twitter / X** | ✅ via backend | ✅ `twitter` | [twitter-cli](https://github.com/public-clis/twitter-cli) ▸ OpenCLI | Cookies (Cookie-Editor export) |
+| 💼 **LinkedIn** | Public pages via Jina | Upstream tool | [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server) ▸ Jina | Optional MCP server + login |
+| 📘 **Facebook** | Upstream tool | Upstream tool | OpenCLI | Desktop Chrome login |
+| 📷 **Instagram** | Upstream tool | Upstream tool | OpenCLI | Desktop Chrome login |
 
----
+"Via backend" means `weblens read`/`search` call the platform's active upstream tool for you. When no backend is working, `read` falls back to Jina Reader and `search` falls back to Exa restricted to that site, and the output includes a note saying so. "Upstream tool" means the agent calls the tool directly; the skill file has the commands.
 
-## Quick Start
-
-> ⚠️ **OpenClaw users: first make sure exec permission is enabled**
->
-> WebLens relies on the Agent running shell commands (`pip install`, `mcporter`, `twitter`, etc.). If your OpenClaw uses the default `messaging` tool profile, the Agent will not be able to run commands. **Enable exec permission before installing**:
->
-> ```bash
-> openclaw config set tools.profile "coding"
-> ```
-> Or set `"tools": { "profile": "coding" }` in `~/.openclaw/openclaw.json`.
-> After that, restart the Gateway (`openclaw gateway restart`) and start a new conversation. Other platforms (Claude Code, Cursor, Windsurf, etc.) are not affected by this restriction.
-
-Copy this sentence to your AI Agent (Claude Code, OpenClaw, Cursor, etc.):
-
-```
-Install WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/install.md
-```
-
-That's the only step. The Agent takes care of everything else.
-
-> 🔄 **Already installed?** Updating is one sentence too:
-> ```
-> Update WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/update.md
-> ```
-
-> 🛡️ **Safe by default:** by default `weblens install` only checks the environment; it does not automatically install system packages or write configuration:
-> ```
-> Safely check and install WebLens for me: https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/install.md
-> ```
-> Only use `weblens install --system` after you have explicitly allowed changes to your system.
+Not sure how to set up a platform? Tell your agent "help me set up Reddit" (or any other platform). The install guide walks it through the steps.
 
 <details>
-<summary>What does it do? (click to expand)</summary>
+<summary><strong>🇨🇳 China pack (optional)</strong></summary>
 
-1. **Install the CLI tool** — installs the `weblens` command line from this repository (bundles yt-dlp and feedparser; do not install the package of the same name from PyPI — it is not this project)
-2. **Check system infrastructure** — checks Node.js, gh CLI, and mcporter, and shows how to install anything missing
-3. **Install and configure as authorized** — only installs dependencies and connects Exa via MCP when `--system` is passed explicitly
-4. **Detect the environment** — determines whether it's running on a local computer or a server and gives matching setup recommendations
-5. **Register SKILL.md as authorized** — only writes to the Agent's skills directory with an explicit `--system`; the default check does not change any files
-6. **Ask whether you want more** — only the 6 zero-config channels are activated by default; for channels that need a login session (Xiaohongshu, Twitter, Reddit, Facebook, Instagram), the Agent shows you a menu and asks which ones you want, and only installs the ones you name
+<br>
 
-After installation, `weblens doctor` tells you in one command the status of each channel and which path it is currently using.
+| Source | What you get | Backend | Setup |
+|---|---|---|---|
+| 📺 **Bilibili** | Search, video details, trending (`weblens read` on a video URL); subtitles via OpenCLI | [bili-cli](https://github.com/public-clis/bilibili-cli) ▸ OpenCLI ▸ search API | None for basics |
+| 📕 **Xiaohongshu (RedNote)** | Search, notes, comments | OpenCLI ▸ [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) ▸ [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) | Existing Chrome session, or Cookie-Editor export |
+| 💻 **V2EX** | Topics + replies (`weblens read`), hot topics, nodes; `search -s v2ex` uses Exa (`site:v2ex.com`) | V2EX public API | None |
+| 📈 **Xueqiu (Snowball)** | Stock quotes, search, hot posts | Xueqiu API | Browser cookie import |
+| 🎙️ **Xiaoyuzhou Podcast** | Episode audio to text | Groq Whisper + ffmpeg | Free Groq key |
+| 🎯 **BOSS Zhipin** | Job search + full JD text | boss-agent-cli over CDP | Dedicated local Chrome; tell your agent "set up BOSS Zhipin for me" |
+
+Xiaohongshu: WebLens never logs in for you and never reads Xiaohongshu browser cookies. OpenCLI only uses a Chrome session that you already have and control. `weblens configure xhs-cookies` does not inject cookies into OpenCLI or Chrome; it is for xiaohongshu-mcp and legacy tools.
+
 </details>
 
----
+### Credentials boundaries
 
-## Works Out of the Box
-
-No configuration needed — just tell your Agent:
-
-- "Take a look at this link" → `curl https://r.jina.ai/URL` reads any web page
-- "What does this GitHub repo do?" → `gh repo view owner/repo`
-- "What does this YouTube video cover?" → `yt-dlp` extracts subtitles
-- "Search Bilibili for AI tutorials" → `bili search` (no login needed)
-- "Search the web for LLM framework comparisons" → Exa semantic search
-- "Subscribe to this RSS feed" → `feedparser` parses it
-
-**No commands to remember.** After reading SKILL.md, the Agent knows what to call on its own. For platforms that require login (Xiaohongshu, Twitter, Reddit, Facebook, Instagram), just tell your Agent "help me set up XXX" to unlock them.
+- **Twitter/X** only accepts cookies you export yourself with Cookie-Editor (`weblens configure twitter-cookies`, hidden prompt). The saved values are used by `weblens doctor` and by `weblens read`/`search`. To run the upstream `twitter` CLI directly, set `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` in that process's environment.
+- **Secrets never go on the command line.** `weblens configure` reads keys, tokens and cookies from a hidden prompt or `--stdin`.
+- **Local machines need no proxy.** Servers may need one for Reddit and X (`weblens configure proxy`).
 
 ---
 
-## Design Philosophy
+## How it works
 
-**WebLens is a capability layer, not yet another tool.**
-
-It sits one level above any specific implementation — it handles **selection, installation, health checks, and routing**, not the reading itself. Reading is done by the Agent calling upstream tools directly, with no wrapper layer.
-
-Whenever you set up the environment for a new Agent, you always spend time finding tools, installing dependencies, and tweaking configs — what do you use to read Twitter? How do you log in to Reddit? The Xiaohongshu CLI stopped being maintained, so what replaces it? You have to hit the same pitfalls all over again every time. What WebLens does is simple: **we choose, install, and health-check the most reliable access path available right now for you. Access paths change over time (in March 2026 a batch of single-platform CLIs all stopped being maintained, and we changed the routing), so you don't have to worry about it.**
-
-### 🔌 Every platform = an ordered list of backends (primary + fallbacks)
-
-Switching access paths = reordering the list, not rewriting code. `weblens doctor` tells you **which backend each platform is currently using**.
+Each platform is one file in `weblens/channels/` with an ordered list of backends. `weblens doctor` probes them in order (it actually runs the tool rather than just checking that it exists) and reports the first one that works. `weblens read` and `weblens search` use the same routing.
 
 ```
 channels/
-├── web.py          → Jina Reader
-├── twitter.py      → twitter-cli ▸ OpenCLI ▸ bird
-├── youtube.py      → yt-dlp
-├── github.py       → gh CLI
-├── bilibili.py     → bili-cli ▸ OpenCLI ▸ search API (yt-dlp blocked by Bilibili's anti-bot controls, retired)
-├── reddit.py       → OpenCLI ▸ rdt-cli (no zero-config path, login session required)
-├── facebook.py     → OpenCLI (desktop browser login session)
-├── instagram.py    → OpenCLI (desktop browser login session)
+├── web.py            → Jina Reader
+├── exa_search.py     → Exa via mcporter
+├── youtube.py        → yt-dlp
+├── github.py         → gh CLI ▸ public REST API
+├── hackernews.py     → HN Firebase API + Algolia
+├── wikipedia.py      → Wikipedia REST + MediaWiki API
+├── arxiv.py          → arXiv API
+├── stackoverflow.py  → Stack Exchange API
+├── rss.py            → feedparser
+├── reddit.py         → OpenCLI ▸ rdt-cli
+├── twitter.py        → twitter-cli ▸ OpenCLI ▸ bird
+├── linkedin.py       → mcp-server-linkedin ▸ Jina Reader
+├── facebook.py       → OpenCLI
+├── instagram.py      → OpenCLI
+├── bilibili.py       → bili-cli ▸ OpenCLI ▸ search API
 ├── xiaohongshu.py  → OpenCLI ▸ xiaohongshu-mcp ▸ xhs-cli
-├── linkedin.py     → mcp-server-linkedin ▸ Jina Reader
-├── rss.py          → feedparser
-├── exa_search.py   → Exa via mcporter
-└── __init__.py     → Channel registry (used by doctor checks)
+├── v2ex.py           → V2EX API
+├── xueqiu.py         → Xueqiu API
+├── xiaoyuzhou.py     → Groq Whisper + ffmpeg
+└── boss.py           → boss-agent-cli (CDP)
 ```
 
-Each channel file **actually probes** its candidate backends in order (not just checking whether a command exists); the first one that fully works is selected, and broken ones come with a fix prescription. The actual reading and searching is done by the Agent calling upstream tools directly.
-
-### Current Tool Choices
-
-| Scenario | Primary | Fallback | Why |
-|------|------|------|-----------|
-| Read web pages | [Jina Reader](https://github.com/jina-ai/reader) | — | Free, no API key needed |
-| Read tweets | [twitter-cli](https://github.com/public-clis/twitter-cli) | [OpenCLI](https://github.com/jackwener/opencli) | Search is stable in real-world tests; OpenCLI falls back on your browser login session |
-| Reddit | [OpenCLI](https://github.com/jackwener/opencli) (desktop) | [rdt-cli](https://github.com/public-clis/rdt-cli) | Anonymous endpoints are blocked and the official API requires approval — only the login-session route is left |
-| Facebook | [OpenCLI](https://github.com/jackwener/opencli) (desktop) | — | Graph API/Groups API permissions have been tightened; a browser login session is currently the most practical route |
-| Instagram | [OpenCLI](https://github.com/jackwener/opencli) (desktop) | Official Graph API (Business/Creator + review) | instaloader-style paths are unstable; OpenCLI reuses a real browser session |
-| YouTube subtitles + search | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | — | 154K stars, still the best for YouTube (note: no longer used for Bilibili) |
-| Bilibili | [bili-cli](https://github.com/public-clis/bilibili-cli) | OpenCLI ▸ search API | yt-dlp is blocked with 412 by Bilibili's anti-bot controls (verified June 2026); bili-cli can search and read without login |
-| Search the web | [Exa](https://exa.ai) via [mcporter](https://github.com/nicobailon/mcporter) | — | AI semantic search, connected via MCP with no key needed |
-| GitHub | [gh CLI](https://cli.github.com) | — | Official tool, full API capabilities after authentication |
-| Read RSS | [feedparser](https://github.com/kurtmckee/feedparser) | — | The standard choice in the Python ecosystem |
-| Xiaohongshu | [OpenCLI](https://github.com/jackwener/opencli) (desktop) | [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) (server) ▸ xhs-cli | OpenCLI only uses the user's existing session; other backends use a manual Cookie-Editor export |
-| LinkedIn | [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server) | Jina Reader | MCP service, browser automation |
-
-> 📌 These are all "current choices", re-verified regularly through real-machine testing. When a path stops working we switch to the next one — `weblens doctor` always tells you which path is in use right now.
+Switching a platform to a different backend means reordering its list, not rewriting callers. You can force one with the config key `<channel>_backend` or the environment variable `<CHANNEL>_BACKEND`.
 
 ---
 
-## Security
+## Use with AI agents
 
-WebLens is designed with security in mind:
-
-| Measure | Details |
-|------|------|
-| 🔒 **Local credential storage** | Cookies and tokens are stored only on your machine in `~/.weblens/config.yaml`, with file permission 600 (owner read/write only), never uploaded or shared |
-| 🛡️ **Safe by default** | `weblens install` does not modify the system by default; external tools are installed and configuration is written only with an explicit `--system` |
-| 👀 **Fully open source** | Transparent code that can be audited anytime. All dependency tools are open-source projects too |
-| 🔍 **Dry Run** | `weblens install --dry-run` previews all actions without making any changes |
-| 🧩 **Pluggable architecture** | Don't trust a component? Just swap out the corresponding channel file — nothing else is affected |
-
-### 🍪 Cookie Security Recommendations
-
-> ⚠️ **Account ban risk:** On platforms that use cookie login (Twitter, Xiaohongshu, etc.), calls made via scripts/APIs **carry a risk of being detected by the platform and getting the account banned**. Always use a **dedicated secondary account**, not your main account.
-
-For platforms that need cookies or a login session (Twitter, Xiaohongshu, Reddit, Facebook, Instagram, etc.), we recommend using a **dedicated secondary account** rather than your main account. There are two reasons:
-1. **Ban risk** — the platform may detect API calls that don't look like normal browser behavior, leading to account restrictions or bans
-2. **Security risk** — a cookie is equivalent to full login access; using a secondary account limits the impact if credentials leak
-
-### 📦 Installation Options
-
-| Option | Command | Best for |
-|------|------|---------|
-| Default safe check | `weblens install --env=auto` | All environments; read-only check that lists what's missing |
-| Explicitly install system dependencies | `weblens install --env=auto --system` | When you explicitly allow changes to the current machine |
-| Compatibility safe flag | `weblens install --env=auto --safe` | Same as the default behavior |
-| Preview only | `weblens install --env=auto --dry-run` | See what it would do first |
-
-### 🗑️ Uninstall
+### Skill file (Claude Code, OpenClaw, OpenCode)
 
 ```bash
-weblens uninstall
+weblens skill --install
 ```
 
-This removes: `~/.weblens/` (including all tokens/cookies), each Agent's skill files, and the MCP configuration in mcporter.
+This copies `SKILL.md` and its `references/` into every agent skill directory it finds: `~/.claude/skills/weblens`, `~/.openclaw/skills/weblens`, `~/.config/opencode/skills/weblens`, or `~/.agents/skills/weblens`. The skill tells the agent to use `weblens read` and `weblens search` first and lists upstream commands for advanced cases.
+
+### MCP server (Cursor, Claude Desktop, any MCP client)
+
+The MCP server needs the `mcp` extra:
 
 ```bash
-# Preview only, don't actually delete
-weblens uninstall --dry-run
+pip install 'weblens[mcp]'
+python -m weblens.integrations.mcp_server   # stdio server
+```
 
-# Delete only the skill files, keep token configuration (for reinstalling)
+Add it to your client config (for example `~/.cursor/mcp.json` or Claude Desktop's `claude_desktop_config.json`). Use the absolute path of the Python interpreter WebLens is installed into:
+
+```json
+{
+  "mcpServers": {
+    "weblens": {
+      "command": "/path/to/python",
+      "args": ["-m", "weblens.integrations.mcp_server"]
+    }
+  }
+}
+```
+
+Claude Code:
+
+```bash
+claude mcp add weblens -- /path/to/python -m weblens.integrations.mcp_server
+```
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `get_status` | — | The `weblens doctor` report |
+| `read` | `url`, `max_chars?`, `format?` (`markdown` \| `json`) | Same output as `weblens read` |
+| `search` | `query`, `source?`, `limit?` (1–50), `format?` | Same output as `weblens search` |
+
+---
+
+## Python API
+
+```python
+from weblens.core import WebLens
+
+lens = WebLens()
+
+page = lens.read("https://en.wikipedia.org/wiki/Model_Context_Protocol", max_chars=2000)
+print(page.title, page.source, page.backend)
+print(page.body)
+print(page.notes)          # fallbacks and caveats, if any
+
+hits = lens.search("retrieval augmented generation", source="arxiv", limit=5)
+for r in hits.results:
+    print(r.title, r.url, r.extra.get("date"))
+
+print(lens.doctor_report())  # same text as `weblens doctor`
+```
+
+`read()` returns a `ReadResult` (`title`, `url`, `source`, `backend`, `body`, `metadata`, `notes`, `truncated`). `search()` returns a `SearchResponse` (`results`, `notes`, `errors`, `sources`). Both have `.to_dict()`. Failures raise `weblens.unified.errors.WebLensError`, which has a `.hint` with the suggested fix.
+
+---
+
+## Security & privacy
+
+| | |
+|---|---|
+| 🌍 **Third-party services** | Generic pages are read through **Jina Reader** (`r.jina.ai`) and web search goes through **Exa**, so those services see the URLs and queries you send. Native sources (HN, Wikipedia, arXiv, Stack Exchange, GitHub, YouTube, V2EX) and RSS/Atom feeds are fetched directly. |
+| 📡 **Direct feed check** | Before a URL that no native channel claims is sent to Jina, WebLens makes one small direct request to it from your machine (or your configured proxy; it reads at most the first 8 KB, with an 8-second limit) to see whether it is an RSS/Atom feed. Feed-shaped URLs such as `/feed`, `.rss` or `.atom` are downloaded directly in full. So the target site sees your IP (or your proxy's) and the `weblens/<version>` User-Agent, not only Jina. |
+| 🚫 **Private targets refused** | `weblens read` refuses localhost, private and link-local IP literals, and internal hostnames (`.local`, `.internal`, cloud metadata). Direct feed fetches and the feed check also require the host, and every redirect hop, to resolve only to public addresses, and they connect to the address that was checked (no second DNS lookup, so DNS rebinding cannot swap in a private IP). Through a proxy (`HTTPS_PROXY` or `weblens configure proxy`), the proxy resolves the host and makes the final connection, so only the pre-check applies. Native channels only talk to their own API hosts over HTTPS. |
+| 🔒 **Local credentials** | Cookies and tokens live only in `~/.weblens/config.yaml` (mode `600`). They are never uploaded. |
+| 📌 **Pinned installs** | `weblens install --system` installs exact versions of mcporter, OpenCLI, twitter-cli and bilibili-cli, and fixed git commits for rdt-cli and boss-agent-cli, never a moving branch. |
+| 🧾 **Shell safety for agents** | The skill file tells agents to pass every URL or query as one single-quoted argument and to refuse input that contains shell metacharacters. |
+| 🛡️ **No surprise changes** | `install` is check-only unless you pass `--system`; `--dry-run` previews; `uninstall` removes everything. |
+
+> ⚠️ **Account-ban risk.** Using cookies or browser sessions from scripts (X, Reddit, Xiaohongshu, Facebook, Instagram, BOSS Zhipin) can get an account flagged or banned. Use a dedicated secondary account, not your main one. A cookie is equivalent to a logged-in session, so a secondary account also limits the damage if it leaks.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+### Uninstall
+
+```bash
+weblens uninstall              # removes ~/.weblens/, skill files, and WebLens MCP entries in mcporter
+weblens uninstall --dry-run    # preview
 weblens uninstall --keep-config
+pip uninstall weblens
 ```
-
-To uninstall the Python package itself: `pip uninstall weblens`
 
 ---
 
-## Credits
+## Troubleshooting
 
-[OpenCLI](https://github.com/jackwener/opencli) · [twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [bili-cli](https://github.com/public-clis/bilibili-cli) · [yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Jina Reader](https://github.com/jina-ai/reader) · [Exa](https://exa.ai) · [mcporter](https://github.com/nicobailon/mcporter) · [feedparser](https://github.com/kurtmckee/feedparser) · [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server)
+Start with `weblens doctor`; each problem comes with a fix. Common cases (YouTube 429, GitHub rate limit, Exa not configured, Stack Exchange quota, X/Twitter auth, BOSS Zhipin login) are covered in [docs/troubleshooting.md](docs/troubleshooting.md). Run any command with `--debug` for a full traceback.
+
+## Contributing
+
+Contributions are welcome, especially new channels and backend fixes. See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, the channel contract and PR guidelines.
 
 ## License
 
 [MIT](LICENSE)
+
+## Credits
+
+WebLens builds on these open-source projects and free services:
+
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) · [Jina Reader](https://github.com/jina-ai/reader) · [Exa](https://exa.ai) · [mcporter](https://github.com/nicobailon/mcporter) · [GitHub CLI](https://cli.github.com) · [feedparser](https://github.com/kurtmckee/feedparser) · [OpenCLI](https://github.com/jackwener/opencli) · [twitter-cli](https://github.com/public-clis/twitter-cli) · [rdt-cli](https://github.com/public-clis/rdt-cli) · [bili-cli](https://github.com/public-clis/bilibili-cli) · [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) · [xhs-cli](https://github.com/jackwener/xiaohongshu-cli) · [mcp-server-linkedin](https://github.com/stickerdaniel/linkedin-mcp-server) · [boss-agent-cli](https://github.com/can4hou6joeng4/boss-agent-cli) · [Groq](https://groq.com) · public APIs from [Hacker News](https://github.com/HackerNews/API), [Algolia HN Search](https://hn.algolia.com/api), [Wikipedia](https://www.mediawiki.org/wiki/API:Main_page), [arXiv](https://info.arxiv.org/help/api/) and [Stack Exchange](https://api.stackexchange.com)

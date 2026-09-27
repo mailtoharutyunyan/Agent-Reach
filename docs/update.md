@@ -32,39 +32,51 @@ Update WebLens to the latest version, refresh upstream tools, migrate from retir
 weblens check-update
 ```
 
-If it says "Already up to date", skip to Step 4 (verify). Otherwise continue.
+If it says "Already up to date", skip to Step 5 (verify). Otherwise continue.
 
 ### Step 2: Update WebLens package
 
+Use the same method the user originally installed with:
+
 ```bash
+pipx upgrade weblens                      # installed with pipx from PyPI
+pip install --upgrade weblens             # installed with pip / inside ~/.weblens-venv
+
+# Installed from GitHub (or PyPI has no newer release yet):
+pipx install --force https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
 pip install --upgrade https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip
 ```
 
 > If pip complains about `externally-managed-environment` (PEP 668), the user
-> originally installed via pipx or a venv — use the matching command:
-> `pipx install --force https://github.com/YOUR_GITHUB_USER/weblens/archive/main.zip`
-> or activate `~/.weblens-venv` first.
+> originally installed via pipx or a venv — use the pipx command, or activate
+> `~/.weblens-venv` first.
 
 ### Step 3: Refresh upstream tools
 
-Run these to keep installed tools current. **Only upgrade what is already
-installed — do not install new tools the user never asked for** (the one
-exception: OpenCLI on desktop, see below).
+Run these to bring installed tools to the versions this WebLens release pins
+(the same versions `weblens install --system` uses). **Only touch what is
+already installed — do not install new tools the user never asked for** (the
+one exception: OpenCLI on desktop, see below).
 
 ```bash
-# Python-based CLIs the user already has (upgrade keeps signatures fresh)
-which twitter >/dev/null 2>&1 && { pipx upgrade twitter-cli 2>/dev/null || uv tool upgrade twitter-cli 2>/dev/null; }
-which bili    >/dev/null 2>&1 && { pipx upgrade bilibili-cli 2>/dev/null || uv tool upgrade bilibili-cli 2>/dev/null; }
-which xhs     >/dev/null 2>&1 && { pipx upgrade xiaohongshu-cli 2>/dev/null || uv tool upgrade xiaohongshu-cli 2>/dev/null; }
+# Python-based CLIs the user already has — pinned versions
+which twitter >/dev/null 2>&1 && { pipx install --force 'twitter-cli==0.8.5' 2>/dev/null || uv tool install --force 'twitter-cli==0.8.5' 2>/dev/null; }
+which bili    >/dev/null 2>&1 && { pipx install --force 'bilibili-cli==0.6.2' 2>/dev/null || uv tool install --force 'bilibili-cli==0.6.2' 2>/dev/null; }
+which rdt     >/dev/null 2>&1 && pipx install --force 'git+https://github.com/public-clis/rdt-cli.git@5e4fb3720d5c174e976cd425ccc3b879d52cac66' 2>/dev/null
+
+# yt-dlp tracks YouTube changes closely; keep it current
 which yt-dlp  >/dev/null 2>&1 && { pipx install --force 'yt-dlp[default]' 2>/dev/null || uv tool install --force 'yt-dlp[default]' 2>/dev/null || python -m pip install -U 'yt-dlp[default]' 2>/dev/null; }
 
-# rdt-cli is pinned to a git source (PyPI lags upstream) — same pin as the code's _RDT_GIT_SOURCE
-which rdt >/dev/null 2>&1 && pipx install --force 'git+https://github.com/public-clis/rdt-cli.git@5e4fb3720d5c174e976cd425ccc3b879d52cac66' 2>/dev/null
-
-# npm-based
-which mcporter >/dev/null 2>&1 && npm update -g mcporter 2>/dev/null
-which opencli  >/dev/null 2>&1 && npm update -g @jackwener/opencli 2>/dev/null
+# npm-based — pinned versions
+which mcporter >/dev/null 2>&1 && npm install -g 'mcporter@0.14.1' 2>/dev/null
+which opencli  >/dev/null 2>&1 && npm install -g '@jackwener/opencli@1.8.8' 2>/dev/null
 ```
+
+> The pins live in `weblens/commands/install.py` (`_TWITTER_CLI_VERSION`,
+> `_BILIBILI_CLI_VERSION`, `_RDT_GIT_SOURCE`, `_MCPORTER_VERSION`,
+> `_OPENCLI_VERSION`). If a newer WebLens release changes them, this guide
+> changes with it. xhs-cli is unmaintained upstream; leave an existing install
+> as it is.
 
 **Desktop users without OpenCLI**: OpenCLI is the preferred
 backend for Xiaohongshu/Reddit (and adds Bilibili subtitles). Offer it once. For
@@ -91,6 +103,8 @@ them automatically — removal is the user's call, not yours.
 ```bash
 weblens version
 weblens doctor
+weblens read 'https://en.wikipedia.org/wiki/Web_browser' --max-chars 300
+weblens search 'web browser' --source hackernews --limit 3
 ```
 
 `weblens doctor` only reports status; it does not install or modify skill
@@ -113,6 +127,7 @@ Tell the user:
    platform is using (from doctor)
 3. Anything that needs their action (e.g. a Chrome extension click, or a
    manual Cookie-Editor export when XiaoHongShu uses MCP / a legacy tool)
-4. What changed in this update (release notes shown by `check-update`)
+4. What changed in this update (release notes shown by `check-update`), for
+   example new `weblens read` / `weblens search` sources
 
 Done.

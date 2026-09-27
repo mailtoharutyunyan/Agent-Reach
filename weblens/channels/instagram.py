@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Instagram — OpenCLI backend using the user's logged-in Chrome session."""
 
 from ._opencli_site import OpenCLISiteChannel

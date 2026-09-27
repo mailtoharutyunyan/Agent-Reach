@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for the ``youtube`` channel.
 
 YouTube's readiness is layered: yt-dlp must probe alive (missing / broken /

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for 'weblens skill' command and _install_skill / _uninstall_skill."""
 
 import importlib.resources
@@ -10,7 +9,7 @@ from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
 
-from weblens.cli import _cmd_skill, _install_skill, _uninstall_skill
+from weblens.commands.skill import _cmd_skill, _install_skill, _uninstall_skill
 
 
 class TestSkillCommand(unittest.TestCase):
@@ -25,6 +24,8 @@ class TestSkillCommand(unittest.TestCase):
 
         self.assertTrue(default_skill.strip())
         self.assertTrue(english_skill.strip())
+        # Both locales ship the same English content; keep them in sync.
+        self.assertEqual(default_skill, english_skill)
 
     def test_exa_reference_uses_default_registered_tools_only(self):
         """Agent instructions must not call Exa tools disabled by default."""
@@ -54,6 +55,23 @@ class TestSkillCommand(unittest.TestCase):
                 content = markdown_file.read_text(encoding="utf-8")
                 self.assertNotRegex(content, function_call)
 
+    def test_skill_docs_teach_single_quoted_untrusted_input(self):
+        """Agent docs must forbid unquoted URL/query interpolation into the shell."""
+        skill_dir = importlib.resources.files("weblens").joinpath("skill")
+        for name in ("SKILL.md", "SKILL_en.md"):
+            text = skill_dir.joinpath(name).read_text(encoding="utf-8")
+            self.assertIn("single-quoted", text, name)
+            self.assertIn("$(", text, name)
+            self.assertIn("Jina Reader or Exa", text, name)
+            self.assertIn("curl -s 'https://r.jina.ai/URL'", text, name)
+            self.assertNotIn("MUST USE", text, name)
+        refs = skill_dir.joinpath("references")
+        for ref in refs.iterdir():
+            if ref.name.endswith(".md"):
+                self.assertIn(
+                    "single-quoted", ref.read_text(encoding="utf-8"), ref.name
+                )
+
     def test_linkedin_reference_uses_current_tool_contract(self):
         """LinkedIn examples should use the current server and parameters."""
         career_reference = (
@@ -64,7 +82,7 @@ class TestSkillCommand(unittest.TestCase):
 
         self.assertIn(
             "linkedin.get_person_profile "
-            'linkedin_username="username" '
+            "linkedin_username='username' "
             'sections="experience,education"',
             career_reference,
         )
@@ -140,7 +158,7 @@ class TestSkillCommand(unittest.TestCase):
         self.assertNotIn("client = BossClient(auth", career)
 
     def test_skill_install_command_exits_nonzero_when_install_fails(self):
-        with patch("weblens.cli._install_skill", return_value=False):
+        with patch("weblens.commands.skill._install_skill", return_value=False):
             with self.assertRaises(SystemExit) as raised:
                 _cmd_skill(Namespace(install=True, uninstall=False))
 
@@ -153,7 +171,7 @@ class TestSkillCommand(unittest.TestCase):
             os.makedirs(skill_dir)
 
             with patch(
-                "weblens.cli.os.path.expanduser",
+                "weblens.commands.skill.os.path.expanduser",
                 side_effect=lambda p: p.replace("~", tmpdir),
             ), patch.dict(os.environ, {}, clear=False):
                 # Remove OPENCLAW_HOME to avoid interference
@@ -184,7 +202,7 @@ class TestSkillCommand(unittest.TestCase):
             self.assertTrue(os.path.exists(skill_path))
 
             with patch(
-                "weblens.cli.os.path.expanduser",
+                "weblens.commands.skill.os.path.expanduser",
                 side_effect=lambda p: p.replace("~", tmpdir),
             ), patch.dict(os.environ, {}, clear=False):
                 env = os.environ.copy()
@@ -202,7 +220,7 @@ class TestSkillCommand(unittest.TestCase):
             os.makedirs(skill_parent)
 
             with patch(
-                "weblens.cli.os.path.expanduser",
+                "weblens.commands.skill.os.path.expanduser",
                 side_effect=lambda p: p.replace("~", tmpdir),
             ), patch.dict(os.environ, {}, clear=False):
                 env = os.environ.copy()
@@ -223,7 +241,7 @@ class TestSkillCommand(unittest.TestCase):
             os.makedirs(skill_parent)
 
             with patch(
-                "weblens.cli.os.path.expanduser",
+                "weblens.commands.skill.os.path.expanduser",
                 side_effect=lambda p: p.replace("~", tmpdir),
             ):
                 env = os.environ.copy()
@@ -237,7 +255,12 @@ class TestSkillCommand(unittest.TestCase):
             with open(target, encoding="utf-8") as f:
                 content = f.read()
             self.assertTrue(content.strip())
-            self.assertIn("Xiaoyuzhou Podcast, LinkedIn", content)
+            english_skill = (
+                importlib.resources.files("weblens")
+                .joinpath("skill", "SKILL_en.md")
+                .read_text(encoding="utf-8")
+            )
+            self.assertEqual(content, english_skill)
             self.assertTrue(
                 os.path.exists(os.path.join(skill_parent, "weblens", "references"))
             )

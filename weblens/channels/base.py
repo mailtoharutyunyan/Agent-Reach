@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Channel base class — platform availability checking.
 
@@ -7,7 +6,9 @@ and provides:
   - can_handle(url) → does this URL belong to this platform?
   - check(config) → is the upstream tool installed and configured?
 
-After installation, agents call upstream tools directly.
+Channels back the installer and ``weblens doctor``; the unified
+``read``/``search`` layer (``weblens.unified``) uses them for routing and
+backend selection. Upstream tools remain available for direct use.
 
 Backend routing semantics:
   - `backends` is an ORDERED candidate list: backends[0] is the preferred
@@ -23,7 +24,6 @@ Backend routing semantics:
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
 
 
 class Channel(ABC):
@@ -31,18 +31,18 @@ class Channel(ABC):
 
     name: str = ""                    # e.g. "youtube"
     description: str = ""             # e.g. "YouTube videos and subtitles"
-    backends: List[str] = []          # ordered candidates — backends[0] = preferred
+    backends: list[str] = []          # ordered candidates — backends[0] = preferred
     tier: int = 0                     # 0=zero-config, 1=needs free key, 2=needs setup
 
     #: Backend currently serving this channel; set by check(), None = unavailable.
-    active_backend: Optional[str] = None
+    active_backend: str | None = None
 
     @abstractmethod
     def can_handle(self, url: str) -> bool:
         """Check if this channel can handle this URL."""
         ...
 
-    def ordered_backends(self, config=None) -> List[str]:
+    def ordered_backends(self, config=None) -> list[str]:
         """Candidate backends in probe order, honoring the user override.
 
         The config key `<channel>_backend` (env `<CHANNEL>_BACKEND`) moves the
@@ -58,7 +58,7 @@ class Channel(ABC):
                     break
         return candidates
 
-    def check(self, config=None) -> Tuple[str, str]:
+    def check(self, config=None) -> tuple[str, str]:
         """
         Check if this channel's upstream tool is available.
         Returns (status, message) where status is 'ok'/'warn'/'off'/'error'.

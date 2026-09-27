@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Verify credential files written by cookie sync helpers and CLI helpers
 are owner-only (0o600) and that values containing shell metacharacters do
 not break the shell-sourceable env file produced by _sync_bird_env().
@@ -16,7 +15,7 @@ import sys
 
 import pytest
 
-from weblens.cli import _configure_xhs_cookies
+from weblens.commands.configure import _configure_xhs_cookies
 from weblens.cookie_extract import _sync_bird_env, _sync_xfetch_session
 
 

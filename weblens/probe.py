@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Lightweight upstream command probing.
 
 Distinguishes the three failure modes that look identical to shutil.which():
@@ -15,8 +14,8 @@ not just file existence.
 
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Optional, Sequence
 
 from weblens.utils.process import utf8_subprocess_env
 
@@ -49,8 +48,8 @@ def probe_command(
     args: Sequence[str] = ("--version",),
     timeout: int = 10,
     retries: int = 0,
-    package: Optional[str] = None,
-    env: Optional[Mapping[str, str]] = None,
+    package: str | None = None,
+    env: Mapping[str, str] | None = None,
     remove_env: Sequence[str] = (),
 ) -> ProbeResult:
     """Actually execute `cmd *args` and classify the result.
@@ -68,7 +67,7 @@ def probe_command(
     if not path:
         return ProbeResult("missing")
 
-    last: Optional[ProbeResult] = None
+    last: ProbeResult | None = None
     for _ in range(retries + 1):
         last = _run_once(path, args, timeout, package or cmd, env, remove_env)
         if last.ok:
@@ -86,7 +85,7 @@ def _run_once(
     args: Sequence[str],
     timeout: int,
     package: str,
-    env: Optional[Mapping[str, str]] = None,
+    env: Mapping[str, str] | None = None,
     remove_env: Sequence[str] = (),
 ) -> ProbeResult:
     try:

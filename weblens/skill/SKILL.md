@@ -1,168 +1,232 @@
 ---
 name: weblens
 description: >
-  MUST USE when user wants to research/search/look up/find anything online
-  — e.g. research X across the web / look up X / search X / what do people
-  think of X / discussion of X / research this topic.
+  Read and search internet content. Use when the user shares a URL or link to
+  read, or asks to research, look up, search, or see what people say about a
+  topic on the web.
 
-  Also MUST USE when user mentions any platform or shares any URL/link:
-  Xiaohongshu/xhs, Twitter/X, Bilibili, Reddit, Facebook, Instagram, V2EX,
-  LinkedIn/BOSS Zhipin/jobs, YouTube, GitHub code search, Xiaoyuzhou podcasts,
-  Xueqiu/stock quotes, RSS feeds, or any web URL.
+  Default path: `weblens read '<url>'` turns any public URL into clean text
+  (Hacker News, Wikipedia, arXiv, Stack Overflow, YouTube transcripts, GitHub,
+  RSS, Reddit, Twitter/X, any web page). `weblens search '<query>'` searches the
+  web or one source (hackernews, wikipedia, arxiv, stackoverflow, youtube,
+  github, reddit, twitter, v2ex, or all).
 
-  16 platforms, multi-backend routing (OpenCLI / per-platform CLIs / APIs).
-  Zero config for 6 channels. Run `weblens doctor --json` to see which
-  backend serves each platform right now.
+  Also covers LinkedIn, Facebook, Instagram, and an optional China pack
+  (Bilibili, Xiaohongshu, V2EX, Xueqiu, Xiaoyuzhou podcasts, BOSS Zhipin) via
+  upstream tools. `weblens doctor --json` shows which backend serves each
+  platform.
 
-  NOT for: reports/analysis/translation (this skill only fetches content);
-  posting/commenting/liking; platforms with a dedicated skill (use that first).
-
-  [Routing] SKILL.md has the routing table + common commands; complex cases: read references/*.md.
-  Categories: search / social / career / dev / web / video / finance.
+  NOT for: writing reports, analysis or translation (this skill only fetches
+  content); posting, commenting or liking; platforms that already have a
+  dedicated skill installed (prefer that skill).
 metadata:
   homepage: https://github.com/YOUR_GITHUB_USER/weblens
 ---
 
-# WebLens — Internet Capability Router
+# WebLens — read and search the web
 
-16 platforms, multiple backends. **When this skill exists, you must use it to access these platforms — do not invent your own approach.**
-
-## Standing rules (apply throughout)
-
-1. **Health-check before acting**: for multi-backend/login-backed platforms (Xiaohongshu/Reddit/Bilibili/Twitter/Facebook/Instagram/BOSS Zhipin), first run
-   `weblens doctor --json`. When `active_backend` has a value, pick the command group accordingly; `active_backend: null`
-   means Doctor skipped live verification to avoid triggering browser cookie reads or remote writes, not that the backend does not exist.
-   Doctor results are a "point-in-time snapshot"; channels/login state may have changed. If you suspect something has gone stale before running a read-only command,
-   re-confirm using the "Health check and recovery" runbook in the matching reference (e.g. the BOSS Zhipin CDP troubleshooting in career.md).
-2. **Announce what you are using**: before starting work, say "using weblens platform X / backend Y".
-3. **Handle failures with the retry chains in references**; do not guess commands.
-4. **Web-wide research tasks**: combine multiple platforms (Exa search + Twitter/Reddit for discussions + Xiaohongshu/Bilibili for Chinese perspectives), collect in parallel, then synthesize.
-5. **Watch versions for the user**: after finishing a substantial research/multi-platform task, also run
-   `weblens check-update` (fast, one API call). If there is a new version, add one line to your wrap-up:
-   "WebLens vX.Y.Z is available — copy this sentence to me to update: Help me update WebLens:
-   https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/update.md".
-   Do not interrupt the current task to update, and do not remind about the same version more than once.
-
-## Routing table
-
-| User intent | Category | Details |
-|---------|------|---------|
-| Web search / code search | search | [references/search.md](references/search.md) |
-| Xiaohongshu/Twitter/Bilibili/V2EX/Reddit/Facebook/Instagram | social | [references/social.md](references/social.md) |
-| Recruiting/jobs/LinkedIn/BOSS Zhipin | career | [references/career.md](references/career.md) |
-| GitHub/code | dev | [references/dev.md](references/dev.md) |
-| Web pages/articles/RSS | web | [references/web.md](references/web.md) |
-| YouTube/Bilibili/podcast transcripts | video | [references/video.md](references/video.md) |
-| Xueqiu/stock quotes | finance | [references/finance.md](references/finance.md) |
-
-## Zero-config quick commands
+Two commands cover most requests:
 
 ```bash
-# Exa web search
-mcporter call exa.web_search_exa query="query" numResults=5
-
-# General web page reading
-curl -s "https://r.jina.ai/URL"
-
-# GitHub search
-gh search repos "query" --sort stars --limit 10
-
-# YouTube subtitles (note: do not use yt-dlp for Bilibili; see video.md for the retry chain)
-yt-dlp --write-sub --write-auto-sub --skip-download -o "/tmp/%(id)s" "URL"
-
-# V2EX hot topics
-curl -s "https://www.v2ex.com/api/topics/hot.json" -H "User-Agent: weblens/1.0"
-
-# Bilibili search (bili-cli, no login needed)
-bili search "query" --type video -n 5
+weblens read 'URL'                        # any public URL → clean text
+weblens search 'query'                    # web search (Exa; falls back to HN + Wikipedia)
+weblens search 'query' --source SOURCE    # one source
+weblens search 'query' --source all       # web + hackernews + wikipedia + stackoverflow + arxiv
 ```
 
-## Login-backed platforms (pick commands by doctor's active_backend)
-
-Twitter note: cookies saved by `weblens configure twitter-cookies` are only for
-`doctor` to check whether configuration is complete; `doctor` does not run `twitter status`, and does not configure the current
-shell. Before running `twitter` directly, you must explicitly provide
-`TWITTER_AUTH_TOKEN` and `TWITTER_CT0` in the subprocess environment, and must not expose their values in logs or command echo.
-
-Xiaohongshu note: WebLens does not log in on the user's behalf and does not read browser cookies. OpenCLI only uses
-a Chrome session the user already has and explicitly controls; if there is no existing session, do not log in automatically — instead
-export manually with Cookie-Editor and configure xiaohongshu-mcp / legacy tools.
-
-BOSS Zhipin setup trigger: when the user says "set up BOSS Zhipin for me", first read the Boss section of `references/career.md`,
-then, after getting installation approval, run
-`weblens install --env=local --system --channels=boss`. The agent is responsible for launching, per OS, a dedicated Chrome
-bound only to `127.0.0.1:9222`; **the first step after launching is to pause and have the user visually confirm**
-that the window is in a logged-in state (avatar in the top-right corner). If not logged in, have the user log in / scan the code; after the user confirms, run
-`boss --cdp-url http://localhost:9222 login --cdp` and `weblens doctor` to verify.
-Do not make the user figure out port parameters themselves.
-The dedicated Chrome profile must be reused long-term; do not create a new one each time, and do not switch to the user's everyday main Chrome by default.
-
-To judge the CDP browser's login state, **do not trust `boss status`** (it only checks the local session.enc, and it and the
-browser login state do not represent each other). Rely on `weblens doctor`'s browser cookie probe (wt2),
-combined with the user's visual confirmation. Never judge login state from the current page URL:
-the `security-check` / `zhipin-security` / `_security_check` security verification pages are Boss anti-scraping challenges
-and have nothing to do with login — they appear even when logged in (almost always with a Chrome that has a CDP debugging port). When you see one, do not
-treat it as "not logged in"; first run `weblens doctor` to check the browser cookie, then decide whether the user needs to log in.
-A search reporting `AUTH_EXPIRED` is the ground truth that the browser is not logged in: go straight to the login flow + `login --cdp`,
-and do not interpret it as a security-verification issue.
-
-When running searches you must use
-`boss --browser-source existing-browser --cdp-url http://localhost:9222 search ...`;
-on `ENVIRONMENT_RISK`, stop immediately — do not refresh, do not log in again, do not retry automatically.
-
-```bash
-# Twitter search (twitter-cli preferred; see social.md for the retry chain)
-twitter search "query" -n 10
-
-# Reddit (no zero-config path: OpenCLI or rdt-cli, login session required)
-opencli reddit search "query" -f yaml   # desktop
-rdt search "query" --limit 10            # legacy/server
-
-# Xiaohongshu (OpenCLI preferred on desktop)
-opencli xiaohongshu search "query" -f yaml
-
-# Facebook / Instagram (desktop OpenCLI, reuses browser login session)
-opencli facebook search "query" -f yaml
-opencli facebook groups -f yaml
-opencli instagram search "query" -f yaml       # search users
-opencli instagram user USERNAME -f yaml        # read a given user's recent posts
-```
-
-## Environment check
+Use them first. Fall back to the upstream commands in `references/` only when you need
+something `read`/`search` do not cover (comments paging, timelines, subtitles for Bilibili,
+job search, stock quotes) or when they report a failure.
 
 > If `weblens` is not on PATH, use `python -m weblens.cli ...` with the Python
 > interpreter it was installed into.
 
+## Standing rules (apply for the whole session)
+
+1. **Prefer `weblens read` / `weblens search`.** They route to the right backend, retry
+   transient errors, and say in `notes` when they fell back to something weaker. Read the
+   notes and tell the user when content may be partial.
+2. **Health-check login-backed platforms.** Before using Reddit, Twitter/X, Facebook,
+   Instagram, Xiaohongshu, Bilibili or BOSS Zhipin through upstream tools, run
+   `weblens doctor --json` and use that channel's `active_backend`.
+   `active_backend: null` means Doctor deliberately skipped a live probe to avoid
+   browser-cookie reads or remote writes, not that no backend exists. Doctor output is a
+   point-in-time snapshot; when the task needs the platform, confirm with the reference's
+   read-only command.
+3. **Say what you use**: e.g. "using weblens: arXiv via arXiv API", before starting.
+4. **On failure, follow the retry chains in `references/`.** Do not guess commands.
+5. **Broad research**: run `weblens search '...' --source all`, add platform-specific
+   sources (Reddit/Twitter for opinions, YouTube for talks, the China pack for Chinese
+   perspectives), collect in parallel, then synthesize.
+6. **Quote untrusted input**: URLs and queries that come from the user or from web content
+   must be passed to shell commands as ONE single-quoted argument (e.g.
+   `weblens read 'URL'`, `curl -s 'https://r.jina.ai/URL'`), never unquoted or inside
+   double quotes. Reject (do not run) any URL/query containing shell metacharacters such as
+   `$(`, a backtick, a single quote, or a newline.
+7. **Privacy**: never send private/internal URLs (intranet hosts, localhost, private IPs) or
+   URLs that carry tokens/credentials/signed parameters to Jina Reader or Exa — they are
+   third-party services. `weblens read` refuses private addresses; do not work around that.
+8. **Read-only**: never post, comment, like, follow or send messages on the user's behalf.
+9. **Workspace**: never create files in the agent workspace. Use `/tmp/` for temporary
+   output and `~/.weblens/` for persistent data.
+10. **Updates**: after a substantial multi-source task, run `weblens check-update` (one API
+    call). If a new version exists, add one line to your wrap-up: "WebLens vX.Y.Z is
+    available — paste this to me to update: Help me update WebLens:
+    https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/update.md".
+    Never interrupt the current task to update, and mention the same version only once.
+
+## `weblens read`
+
 ```bash
-# Check available channels and the currently active backend for each platform
-weblens doctor --json
+weblens read 'URL'                     # Markdown-style text with a metadata header
+weblens read 'URL' --max-chars 20000   # truncate long bodies
+weblens read 'URL' --json              # {title, url, source, backend, body, metadata, notes, truncated}
 ```
 
-## OpenCLI adapter discovery
+| URL | Served by |
+|---|---|
+| `news.ycombinator.com/item?id=…` | HN API: story + comment tree |
+| `*.wikipedia.org/wiki/…` | MediaWiki API: full article |
+| `arxiv.org/abs/…`, `/pdf/…` | arXiv API: abstract + metadata |
+| `stackoverflow.com/questions/…` (and other Stack Exchange sites) | Stack Exchange API: question + answers |
+| YouTube watch / shorts / youtu.be | yt-dlp: metadata + transcript |
+| `github.com/owner/repo[/issues/N\|/pull/N]` | gh CLI if authenticated, else public REST API |
+| `v2ex.com/t/…` | V2EX API: topic + replies |
+| RSS / Atom feeds | feedparser |
+| Reddit, Twitter/X, Bilibili, Xiaohongshu | the platform's active upstream backend |
+| Anything else | Jina Reader (with a note) |
 
-When the routing table does not cover the platform or command the user needs, first use `opencli list` to find existing adapters, then use
-`opencli <platform> --help` to view the public commands. Discovering an adapter only proves the command exists, not that the login state or
-target content is available; only run read-only commands when the user's task clearly requires that platform, and verify by actual non-empty content.
+Exit codes: `0` ok, `1` failed (the message includes a hint), `2` bad input (invalid or
+private URL). Add `--debug` for a traceback.
 
-## Workspace rules
+## `weblens search`
 
-**Do not create files in the agent workspace.** Use `/tmp/` for temporary output and `~/.weblens/` for persistent data.
+```bash
+weblens search 'query' -s hackernews -n 5
+weblens search 'query' -s arxiv --json
+```
 
-## Detailed docs
+| Source | Backend | Notes |
+|---|---|---|
+| `web` (default) | Exa via mcporter | Falls back to hackernews + wikipedia if Exa is not configured |
+| `hackernews` | Algolia HN Search | points, comments, date |
+| `wikipedia` | MediaWiki search | |
+| `arxiv` | arXiv API | authors, date, PDF link |
+| `stackoverflow` | Stack Exchange API | score, answers, tags |
+| `youtube` | yt-dlp `ytsearch` | |
+| `github` | gh CLI or public REST API | repositories |
+| `reddit`, `twitter` | active upstream backend | else Exa restricted to the site |
+| `v2ex` | Exa `site:v2ex.com` | V2EX has no search API |
+| `all` | web + hackernews + wikipedia + stackoverflow + arxiv in parallel | one failing source does not fail the rest |
 
-Based on the user's needs, read the matching detailed doc:
+`--limit/-n` is per source (default 10, max 50). Queries must not start with `-`.
 
-- [Search tools](references/search.md) — Exa AI search
-- [Social media](references/social.md) — Xiaohongshu, Twitter, Bilibili, V2EX, Reddit, Facebook, Instagram (multi-backend/login-backed command groups)
-- [Careers & recruiting](references/career.md) — LinkedIn, BOSS Zhipin
-- [Developer tools](references/dev.md) — GitHub CLI
-- [Web reading](references/web.md) — Jina Reader, RSS
-- [Video & podcasts](references/video.md) — YouTube, Bilibili, Xiaoyuzhou
-- [Finance & market data](references/finance.md) — Xueqiu stock quotes, search, trending content
+## Routing table (advanced / upstream tools)
 
-## Configuring channels
+| User intent | Category | Details |
+|---|---|---|
+| Web search, HN / Wikipedia / arXiv / Stack Overflow search | search | [references/search.md](references/search.md) |
+| Web pages, articles, RSS, Wikipedia articles | web | [references/web.md](references/web.md) |
+| GitHub, Stack Overflow, Hacker News, arXiv, code | dev | [references/dev.md](references/dev.md) |
+| YouTube, Bilibili, podcast transcripts | video | [references/video.md](references/video.md) |
+| Twitter/X, Reddit, Facebook, Instagram — and Xiaohongshu, Bilibili, V2EX | social | [references/social.md](references/social.md) |
+| Jobs: LinkedIn, BOSS Zhipin | career | [references/career.md](references/career.md) |
+| Xueqiu / stock quotes | finance | [references/finance.md](references/finance.md) |
 
-If a channel needs configuration, get the installation guide:
+## Upstream quick commands
+
+Use these when `read`/`search` are not enough.
+
+```bash
+# Exa web search (direct)
+mcporter call exa.web_search_exa query='query' numResults=5
+
+# Any web page via Jina Reader (direct)
+curl -s 'https://r.jina.ai/URL'
+
+# GitHub
+gh search repos 'query' --sort stars --limit 10
+
+# YouTube subtitles (never use yt-dlp for Bilibili; retry chain in video.md)
+yt-dlp --write-sub --write-auto-sub --skip-download -o '/tmp/%(id)s' 'URL'
+```
+
+### Login-backed global platforms (pick commands by doctor's `active_backend`)
+
+Twitter boundary: cookies saved by `weblens configure twitter-cookies` are used by
+`weblens doctor` (configuration check only; it does not run `twitter status` or configure
+the current shell) and passed to the child process by `weblens read`/`search`. Before
+calling `twitter` directly, explicitly provide `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` in the
+child-process environment without logging or echoing their values.
+
+```bash
+# Twitter/X (twitter-cli preferred; retry chain in social.md)
+twitter search 'query' -n 10
+
+# Reddit (no zero-config path — OpenCLI or rdt-cli, login required)
+opencli reddit search 'query' -f yaml    # desktop
+rdt search 'query' --limit 10            # legacy/server
+
+# Facebook / Instagram (desktop OpenCLI, reuses the browser session)
+opencli facebook search 'query' -f yaml
+opencli facebook groups -f yaml
+opencli instagram search 'query' -f yaml       # user search
+opencli instagram user USERNAME -f yaml        # recent posts from one user
+```
+
+### China pack
+
+```bash
+# Bilibili search (bili-cli, no login needed)
+bili search 'query' --type video -n 5
+
+# V2EX hot topics
+curl -s 'https://www.v2ex.com/api/topics/hot.json' -H 'User-Agent: weblens/1.0'
+
+# Xiaohongshu (desktop prefers OpenCLI)
+opencli xiaohongshu search 'query' -f yaml
+```
+
+Xiaohongshu boundary: WebLens must not log the user in or read browser cookies. OpenCLI may
+use only an existing Chrome session explicitly controlled by the user. If none exists, do not
+automate login; use a manual Cookie-Editor export with xiaohongshu-mcp or a legacy tool
+instead (see social.md).
+
+Xueqiu quotes and posts: see [references/finance.md](references/finance.md).
+Xiaoyuzhou podcast transcription: see [references/video.md](references/video.md).
+
+**BOSS Zhipin.** When the user asks "set up BOSS Zhipin for me", read the Boss section in
+`references/career.md` first. After explicit install approval, run
+`weblens install --env=local --system --channels=boss`, launch the dedicated loopback-only
+Chrome profile for their OS, then **pause and have the user visually confirm** the window is
+logged in (avatar in the top-right); if not, have them log in manually. Then verify with
+`boss --cdp-url http://localhost:9222 login --cdp` and `weblens doctor`. Do not make the user
+assemble CDP flags. Keep reusing the dedicated Chrome profile; do not recreate it for every
+run or switch to the user's daily profile by default. Search with
+`boss --browser-source existing-browser --cdp-url http://localhost:9222 search ...`.
+On `ENVIRONMENT_RISK`, stop without refreshing, relogging, or retrying.
+
+Do not trust `boss status` for CDP browser login state — it only validates the local
+`~/.boss-agent/auth/session.enc` store. Use the browser `wt2` cookie probe in
+`weblens doctor` plus the user's visual confirmation. Never judge login state from the page
+URL: `security-check` / `zhipin-security` / `_security_check` pages are anti-bot challenges
+that appear even when logged in. `AUTH_EXPIRED` from a search is the ground truth for a
+logged-out browser — go straight to the login flow + `login --cdp`.
+
+## Discovering OpenCLI adapters
+
+When the routing table lacks a needed platform or command, run `opencli list`, then inspect
+`opencli <platform> --help`. Discovery proves only that an adapter exists, not that
+authentication or target content works. Run read-only commands only when the user's task
+requires that platform, and require non-empty content.
+
+## Environment check and setup
+
+```bash
+weblens doctor --json    # channel availability + active backend per platform
+```
+
+If a channel needs setup, follow the install guide:
 https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/install.md
 
-The user only needs to provide cookies; the agent handles all other configuration.
+The user only provides cookies, keys, or a browser-extension click; you do the rest.

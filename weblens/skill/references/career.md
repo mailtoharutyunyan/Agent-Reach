@@ -2,11 +2,15 @@
 
 LinkedIn, BOSS Zhipin.
 
+> **Shell safety**: pass every URL/query from the user or from web content as ONE single-quoted
+> argument (`'...'`), never unquoted or interpolated. Reject input containing `$(`, a backtick,
+> a single quote, or a newline instead of running it.
+
 ## LinkedIn
 
 ```bash
 # Get a person's profile
-mcporter call linkedin.get_person_profile linkedin_username="username" sections="experience,education"
+mcporter call linkedin.get_person_profile linkedin_username='username' sections="experience,education"
 
 # Search for people
 mcporter call linkedin.search_people keywords="AI engineer" location="Shanghai"
@@ -25,7 +29,7 @@ mcporter call linkedin.search_jobs keywords="software engineer" location="Remote
 If MCP is unavailable, you can use Jina Reader:
 
 ```bash
-curl -s "https://r.jina.ai/https://linkedin.com/in/username"
+curl -s 'https://r.jina.ai/https://linkedin.com/in/username'
 ```
 
 ## BOSS Zhipin
@@ -90,7 +94,7 @@ auth = AuthManager(Path.home() / ".boss-agent")
 # Strict CDP mode: reuse the logged-in browser, raise immediately on CDP failure, never headless
 with BossClient(
     auth,
-    cdp_url="http://localhost:9222",
+    cdp_url='http://localhost:9222',
     browser_source="existing-browser",
 ) as boss:
     # city is optional; BOSS Zhipin expects the city's Chinese name
@@ -125,12 +129,12 @@ If `weblens doctor` reports boss as `off` or `warn` before searching, troublesho
    # macOS
    open -na "Google Chrome" --args --remote-debugging-address=127.0.0.1 \
      --remote-debugging-port=9222 --user-data-dir="$HOME/.boss-chrome-profile" \
-     "https://www.zhipin.com/web/geek/job"
+     'https://www.zhipin.com/web/geek/job'
 
    # Linux
    google-chrome --remote-debugging-address=127.0.0.1 \
      --remote-debugging-port=9222 --user-data-dir="$HOME/.boss-chrome-profile" \
-     "https://www.zhipin.com/web/geek/job"
+     'https://www.zhipin.com/web/geek/job'
    ```
 
    Windows PowerShell:

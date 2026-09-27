@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for weblens.probe — real-execution probing and failure classification."""
 
 import os

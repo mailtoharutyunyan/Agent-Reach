@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """XiaoHongShu — multi-backend: OpenCLI / xiaohongshu-mcp / xhs-cli.
 
 Backend order encodes the recommendation, and probing order makes the

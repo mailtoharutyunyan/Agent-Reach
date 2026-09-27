@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Configuration management for WebLens.
 
 Stores settings in ~/.weblens/config.yaml. Reads never create files or
@@ -9,7 +8,7 @@ import os
 import stat
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -113,7 +112,7 @@ class Config:
 
     def __init__(
         self,
-        config_path: Optional[Path] = None,
+        config_path: Path | None = None,
         *,
         read_only: bool = False,
     ):

@@ -11,6 +11,10 @@ from argparse import Namespace
 import pytest
 
 from weblens import cli
+from weblens.commands import configure as configure_cmd
+from weblens.commands import install as install_cmd
+from weblens.commands import skill as skill_cmd
+from weblens.commands import transcribe as transcribe_cmd
 from weblens.cookie_extract import _sync_bird_env, _sync_xfetch_session
 from weblens.utils import paths
 
@@ -116,7 +120,7 @@ def test_credential_writes_honor_home_when_expanduser_disagrees(
 
     assert _sync_xfetch_session("auth", "ct0") is True
     assert _sync_bird_env("auth", "ct0") is True
-    assert cli._configure_xhs_cookies("web_session=xhs-secret") is True
+    assert configure_cmd._configure_xhs_cookies("web_session=xhs-secret") is True
 
     assert (intended_home / ".config" / "xfetch" / "session.json").exists()
     assert (intended_home / ".config" / "bird" / "credentials.env").exists()
@@ -209,7 +213,7 @@ def test_xhs_cookie_editor_json_ignores_non_xhs_domains(
         },
     ]
 
-    cli._configure_xhs_cookies(json.dumps(exported))
+    configure_cmd._configure_xhs_cookies(json.dumps(exported))
 
     cookie_path = tmp_path / ".weblens" / "xhs-cookies.json"
     saved = json.loads(cookie_path.read_text(encoding="utf-8"))
@@ -242,7 +246,7 @@ def test_xhs_cookie_editor_json_fails_without_valid_xhs_cookie(
 
     monkeypatch.setattr("weblens.config.Config", lambda: object())
     with pytest.raises(SystemExit) as exc:
-        cli._cmd_configure(
+        configure_cmd._cmd_configure(
             Namespace(
                 from_browser=None,
                 key="xhs-cookies",
@@ -271,7 +275,7 @@ def test_xhs_local_fallback_refuses_target_symlink(
     except OSError:
         pytest.skip("symlinks are not supported on this platform")
 
-    result = cli._configure_xhs_cookies("web_session=xhs-secret")
+    result = configure_cmd._configure_xhs_cookies("web_session=xhs-secret")
 
     assert result is False
     assert victim.read_text(encoding="utf-8") == '{"keep": "unchanged"}'
@@ -301,7 +305,7 @@ def test_xhs_docker_success_via_configure_command_does_not_exit(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._cmd_configure(
+    configure_cmd._cmd_configure(
         Namespace(
             from_browser=None,
             key="xhs-cookies",
@@ -340,7 +344,7 @@ def test_xhs_docker_failure_via_configure_command_exits_one(
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     with pytest.raises(SystemExit) as exc:
-        cli._cmd_configure(
+        configure_cmd._cmd_configure(
             Namespace(
                 from_browser=None,
                 key="xhs-cookies",
@@ -392,7 +396,7 @@ def test_ytdlp_config_write_refuses_target_symlink(
     monkeypatch.setattr(shutil, "which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     assert victim.read_text(encoding="utf-8") == "# keep unchanged\n"
     assert config_path.is_symlink()
@@ -417,7 +421,7 @@ def test_transcribe_cli_scrubs_credentials_from_errors(
     monkeypatch.setattr(transcribe_module, "transcribe", fail_transcribe)
 
     with pytest.raises(SystemExit) as exc:
-        cli._cmd_transcribe(
+        transcribe_cmd._cmd_transcribe(
             Namespace(
                 source=secret_url,
                 provider="auto",
@@ -438,8 +442,8 @@ def test_safe_install_with_proxy_makes_no_persistent_writes(
     observed_configs = []
     skill_calls = []
 
-    monkeypatch.setattr(cli, "_install_system_deps_safe", lambda: None)
-    monkeypatch.setattr(cli, "_install_mcporter_safe", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps_safe", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_mcporter_safe", lambda: None)
     monkeypatch.setattr(
         "weblens.doctor.check_all",
         lambda config: observed_configs.append(config) or {},
@@ -449,12 +453,12 @@ def test_safe_install_with_proxy_makes_no_persistent_writes(
         lambda _results: "report",
     )
     monkeypatch.setattr(
-        cli,
+        skill_cmd,
         "_install_skill",
         lambda: skill_calls.append("installed"),
     )
 
-    cli._cmd_install(
+    install_cmd._cmd_install(
         Namespace(
             env="local",
             proxy="http://user:pass@proxy.example:8080",
@@ -482,17 +486,17 @@ def test_install_is_safe_by_default(isolated_home, monkeypatch, capsys):
     """Plain install checks readiness without modifying the host."""
     monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_install_system_deps",
         lambda: pytest.fail("default install must not modify system dependencies"),
     )
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_install_mcporter",
         lambda: pytest.fail("default install must not install global tools"),
     )
     monkeypatch.setattr(
-        cli,
+        skill_cmd,
         "_install_skill",
         lambda: pytest.fail("default install must not register agent skills"),
     )
@@ -522,17 +526,17 @@ def test_install_system_flag_explicitly_enables_writes(
     calls = []
     monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_install_system_deps",
         lambda: calls.append("system-deps"),
     )
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_install_mcporter",
         lambda: calls.append("mcporter"),
     )
     monkeypatch.setattr(
-        cli,
+        skill_cmd,
         "_install_skill",
         lambda: calls.append("skill"),
     )
@@ -559,9 +563,9 @@ def test_install_system_exits_nonzero_when_core_steps_fail(
 ):
     """Automation must not receive exit zero after failed core installation."""
     monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
-    monkeypatch.setattr(cli, "_install_system_deps", lambda: False)
-    monkeypatch.setattr(cli, "_install_mcporter", lambda: False)
-    monkeypatch.setattr(cli, "_install_skill", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps", lambda: False)
+    monkeypatch.setattr(install_cmd, "_install_mcporter", lambda: False)
+    monkeypatch.setattr(skill_cmd, "_install_skill", lambda: None)
     monkeypatch.setattr("weblens.doctor.check_all", lambda _config: {})
     monkeypatch.setattr(
         "weblens.doctor.format_report",
@@ -586,10 +590,10 @@ def test_install_system_exits_nonzero_when_requested_channel_fails(
     isolated_home, monkeypatch, capsys
 ):
     monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
-    monkeypatch.setattr(cli, "_install_system_deps", lambda: True)
-    monkeypatch.setattr(cli, "_install_mcporter", lambda: True)
-    monkeypatch.setattr(cli, "_install_opencli_deps", lambda: False)
-    monkeypatch.setattr(cli, "_install_skill", lambda: True)
+    monkeypatch.setattr(install_cmd, "_install_system_deps", lambda: True)
+    monkeypatch.setattr(install_cmd, "_install_mcporter", lambda: True)
+    monkeypatch.setattr(install_cmd, "_install_opencli_deps", lambda: False)
+    monkeypatch.setattr(skill_cmd, "_install_skill", lambda: True)
     monkeypatch.setattr("weblens.doctor.check_all", lambda _config: {})
     monkeypatch.setattr(
         "weblens.doctor.format_report",
@@ -619,9 +623,9 @@ def test_install_system_exits_nonzero_when_skill_install_fails(
     isolated_home, monkeypatch, capsys
 ):
     monkeypatch.setattr(cli, "_configure_logging", lambda _verbose=False: None)
-    monkeypatch.setattr(cli, "_install_system_deps", lambda: True)
-    monkeypatch.setattr(cli, "_install_mcporter", lambda: True)
-    monkeypatch.setattr(cli, "_install_skill", lambda: False)
+    monkeypatch.setattr(install_cmd, "_install_system_deps", lambda: True)
+    monkeypatch.setattr(install_cmd, "_install_mcporter", lambda: True)
+    monkeypatch.setattr(skill_cmd, "_install_skill", lambda: False)
     monkeypatch.setattr("weblens.doctor.check_all", lambda _config: {})
     monkeypatch.setattr(
         "weblens.doctor.format_report",

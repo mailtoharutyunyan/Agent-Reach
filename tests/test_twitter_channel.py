@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Twitter health checks must never trigger upstream browser-cookie fallback."""
 
 import os

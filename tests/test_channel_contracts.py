@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Contract tests for channel adapters."""
 
 import subprocess
@@ -176,6 +175,10 @@ def test_channel_can_handle_contract():
         "linkedin": "https://www.linkedin.com/in/test",
         "rss": "https://example.com/feed.xml",
         "xueqiu": "https://xueqiu.com/S/SH600519",
+        "hackernews": "https://news.ycombinator.com/item?id=1",
+        "stackoverflow": "https://stackoverflow.com/questions/1",
+        "wikipedia": "https://en.wikipedia.org/wiki/Python",
+        "arxiv": "https://arxiv.org/abs/1706.03762",
         "exa_search": "https://example.com",
         "web": "https://example.com",
     }

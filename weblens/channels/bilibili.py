@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Bilibili — multi-backend: bili-cli / OpenCLI / search API.
 
 yt-dlp was REMOVED from this channel (live-verified 2026-06): bilibili's

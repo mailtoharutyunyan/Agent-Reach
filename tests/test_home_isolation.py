@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """Regression guards for test-suite and Doctor filesystem isolation."""
 
 import os
 from argparse import Namespace
 from pathlib import Path
 
-import weblens.cli as cli
+from weblens.commands import doctor as doctor_cmd
+from weblens.commands import skill as skill_cmd
 from weblens.config import Config
 
 
@@ -23,14 +23,14 @@ def test_doctor_leaves_sandbox_home_unchanged(
     monkeypatch.setattr("weblens.doctor.check_all", lambda config: {})
     monkeypatch.setattr("weblens.doctor.format_report", lambda results: "report")
     monkeypatch.setattr(
-        cli,
+        skill_cmd,
         "_install_skill",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("doctor must not install skills")
         ),
     )
 
-    cli._cmd_doctor(Namespace(json=False))
+    doctor_cmd._cmd_doctor(Namespace(json=False))
 
     assert capsys.readouterr().out.strip() == "report"
     assert list(isolated_home.iterdir()) == []

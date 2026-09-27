@@ -1,31 +1,47 @@
 # WebLens
 
-> Give your AI agent a clear view of the web. WebLens installs, routes, and health-checks upstream tools for 15 platforms — Twitter/X, Reddit, Facebook, Instagram, YouTube, GitHub, Bilibili, XiaoHongShu, LinkedIn, V2EX, Xueqiu, Xiaoyuzhou Podcast, RSS, web search, and any web page. One install, zero API fees.
+> One command to read and search the web, for people and AI agents. `weblens read <url>` turns any public URL into clean text, routed to the best backend (Hacker News, Wikipedia, arXiv, Stack Overflow, YouTube transcripts, GitHub, RSS, Reddit, Twitter/X, V2EX, Bilibili, Xiaohongshu, else Jina Reader). `weblens search <query>` searches the web (Exa) or one source. WebLens also installs (pinned versions) and health-checks the upstream tools behind each platform. Free, open source, MIT. PyPI package: `weblens`.
 
 ## Quick Start
 
-- [Installation Guide](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/docs/install.md): Step-by-step setup instructions for AI agents
-- [README](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/README.md): Full documentation
+- [README](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/README.md): Overview, commands, supported sources, agent setup, Python API, security
+- [Installation Guide](https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/install.md): Step-by-step setup written for AI agents (`pipx install weblens`, then `weblens install --env=auto`)
+- [Update Guide](https://raw.githubusercontent.com/YOUR_GITHUB_USER/weblens/main/docs/update.md): Upgrade WebLens and refresh pinned upstream tools
 
 ## Core Commands
 
-- [CLI Usage](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/docs/install.md): `weblens doctor --json` shows the active backend; agents then call upstream tools directly (`opencli`, `twitter`, `bili`, `yt-dlp`, `gh`, `mcporter`, etc.).
+- `weblens read '<url>' [--json] [--max-chars N]`: read any public URL as clean text with a metadata header; notes report fallbacks
+- `weblens search '<query>' [--source/-s SOURCE] [--limit/-n N] [--json]`: sources `web` (default; Exa, falls back to hackernews + wikipedia), `hackernews`, `wikipedia`, `arxiv`, `stackoverflow`, `youtube`, `github`, `v2ex`, `reddit`, `twitter`, `all` (web + hackernews + wikipedia + stackoverflow + arxiv in parallel)
+- `weblens doctor [--json]`: channel status and the active backend per platform
+- `weblens install --env=auto [--system] [--dry-run] [--channels LIST]`: check-only by default; `--system` installs and configures
+- `weblens configure <key>`, `weblens skill --install`, `weblens transcribe <url-or-file>`, `weblens watch`, `weblens check-update`, `weblens uninstall`
+- Global flags: `--debug` (tracebacks), `-v`. Exit codes: 0 ok, 1 failure, 2 bad usage
 
-## Key Features
+## Sources
 
-- Read any URL: tweets, Reddit posts, Facebook pages/feed/groups, Instagram profiles/posts, YouTube videos (transcripts), GitHub repos, articles, XiaoHongShu notes, Bilibili videos, RSS feeds
-- Search/discover across platforms: Twitter/X, Reddit, Facebook, Instagram user search, GitHub, YouTube, Bilibili, XiaoHongShu, LinkedIn, V2EX, Xueqiu, Web (via Exa)
-- Self-diagnosis: `weblens doctor` checks what works and what needs setup
-- Auto-installs dependencies: `weblens install --env=auto`
-- Browser-session / cookie auth for platforms that require login (Twitter, Reddit, Facebook, Instagram, XiaoHongShu, Xueqiu)
-- Proxy support for platforms that block server IPs (Reddit, Twitter)
-- Zero API fees: all backends are free and open-source (OpenCLI, twitter-cli, rdt-cli, bili-cli, yt-dlp, Jina Reader, mcporter/Exa, etc.)
+- Zero-config: any web page (Jina Reader), web search (Exa via mcporter, free), YouTube (yt-dlp), GitHub (gh or public API), Hacker News, Wikipedia, arXiv, Stack Overflow / Stack Exchange, RSS/Atom, V2EX
+- Login or setup: Reddit (OpenCLI / rdt-cli), Twitter/X (twitter-cli / OpenCLI, Cookie-Editor cookies), LinkedIn (mcp-server-linkedin), Facebook and Instagram (OpenCLI, desktop Chrome session)
+- China pack (optional): Bilibili (bili-cli), Xiaohongshu (OpenCLI / xiaohongshu-mcp), V2EX, Xueqiu, Xiaoyuzhou podcasts (Groq Whisper), BOSS Zhipin (boss-agent-cli over CDP)
+
+## Integrations
+
+- [Agent skill](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/weblens/skill/SKILL.md): `weblens skill --install` registers it for Claude Code, OpenClaw, OpenCode and `~/.agents/skills`
+- MCP server: `python -m weblens.integrations.mcp_server` (stdio; install with `pip install 'weblens[mcp]'`). Tools: `get_status`, `read(url, max_chars?, format?)`, `search(query, source?, limit?, format?)`
+- Python API: `from weblens.core import WebLens; WebLens().read(url)`, `WebLens().search(query, source="arxiv")`
+
+## Security
+
+- `read` refuses localhost, private IPs and internal hostnames; Jina Reader and Exa see the URLs/queries sent to them
+- Credentials stay in `~/.weblens/config.yaml` (mode 600), entered via hidden prompt or `--stdin`
+- Upstream installs are pinned to exact versions or commits
+- [Security policy](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/SECURITY.md)
 
 ## Troubleshooting
 
-- [Troubleshooting Guide](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/docs/troubleshooting.md): Common issues and solutions
+- [Troubleshooting Guide](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/docs/troubleshooting.md): YouTube 429, GitHub rate limit, Exa not configured, Stack Exchange quota, Twitter/X auth, BOSS Zhipin login
 
 ## Optional
 
-- [SKILL.md](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/weblens/skill/SKILL.md): Integration guide for AI agent frameworks (OpenClaw, Claude Code, etc.)
+- [Changelog](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/CHANGELOG.md)
+- [Contributing](https://github.com/YOUR_GITHUB_USER/weblens/blob/main/CONTRIBUTING.md): dev setup and how to add a channel
 - [PyPI Package](https://pypi.org/project/weblens/): `pip install weblens`

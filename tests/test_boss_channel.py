@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for the ``boss`` channel.
 
 BOSS Zhipin goes through the CDP debug port, reusing an already-logged-in real Chrome (headless is off-limits: code 36 risk control).

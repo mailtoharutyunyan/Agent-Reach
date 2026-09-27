@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """OpenCLI backend probing.
 
 OpenCLI (github.com/jackwener/opencli) drives the user's real Chrome via a

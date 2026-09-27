@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """BOSS Zhipin — search jobs and fetch JDs via boss-agent-cli + a real Chrome over CDP.
 
 The backend is boss-agent-cli (reusing an already-logged-in real Chrome through the CDP debug port). Headless is off-limits

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Cross-channel backends.
 
 A backend here is an upstream runtime that serves MULTIPLE channels

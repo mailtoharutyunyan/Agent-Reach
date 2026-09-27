@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for the OpenCLI cross-channel backend probing."""
 
 from unittest.mock import patch

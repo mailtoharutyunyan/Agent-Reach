@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for the ``v2ex`` channel.
 
 V2EX rides the public JSON API and reshapes each endpoint: hot/node topic

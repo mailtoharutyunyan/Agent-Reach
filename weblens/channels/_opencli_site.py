@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Shared channel helper for OpenCLI browser-session-only platforms."""
 
 from weblens.utils.url import host_matches

@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 """Tests for weblens.transcribe — provider routing, fallback, and errors."""
 
 import subprocess
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -108,7 +106,7 @@ class TestFallback:
     def test_groq_succeeds_no_openai_call(self, monkeypatch, fake_config, chunk_file):
         fake_config.set("groq_api_key", "gsk_test")
         fake_config.set("openai_api_key", "sk-test")
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, headers=None, files=None, data=None, timeout=None):
             calls.append(url)
@@ -122,7 +120,7 @@ class TestFallback:
     def test_groq_429_falls_back_to_openai(self, monkeypatch, fake_config, chunk_file):
         fake_config.set("groq_api_key", "gsk_test")
         fake_config.set("openai_api_key", "sk-test")
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, headers=None, files=None, data=None, timeout=None):
             calls.append(url)
@@ -141,7 +139,7 @@ class TestFallback:
     def test_skip_unconfigured_provider(self, monkeypatch, fake_config, chunk_file):
         # Only openai key configured — fallback should skip groq silently.
         fake_config.set("openai_api_key", "sk-test")
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, headers=None, files=None, data=None, timeout=None):
             calls.append(url)
@@ -190,7 +188,7 @@ class TestOrchestrator:
         compressed = tmp_path / "compressed.m4a"
         compressed.write_bytes(b"compressed")
         monkeypatch.setattr(tr, "compress_audio", lambda *_args: compressed)
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, **_kwargs):
             calls.append(url)
@@ -222,7 +220,7 @@ class TestOrchestrator:
         compressed = tmp_path / "compressed.m4a"
         compressed.write_bytes(b"compressed")
         monkeypatch.setattr(tr, "compress_audio", lambda *_args: compressed)
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, **_kwargs):
             calls.append(url)
@@ -257,7 +255,7 @@ class TestOrchestrator:
         compressed = tmp_path / "compressed.m4a"
         compressed.write_bytes(b"compressed")
         monkeypatch.setattr(tr, "compress_audio", lambda *_args: compressed)
-        calls: List[str] = []
+        calls: list[str] = []
 
         def fake_post(url, **_kwargs):
             calls.append(url)
@@ -606,7 +604,34 @@ class TestOrchestrator:
         assert (work / "compressed.m4a").exists()
 
 
+def _fake_getaddrinfo(*addresses):
+    import socket
+
+    def fake(host, port, *args, **kwargs):
+        return [
+            (
+                socket.AF_INET6 if ":" in addr else socket.AF_INET,
+                socket.SOCK_STREAM,
+                6,
+                "",
+                (addr, 0, 0, 0) if ":" in addr else (addr, 0),
+            )
+            for addr in addresses
+        ]
+
+    return fake
+
+
 class TestDownloadAudioSafety:
+    @pytest.fixture(autouse=True)
+    def _public_dns(self, monkeypatch):
+        """Hostnames resolve to a public address unless a test overrides it."""
+        import socket
+
+        monkeypatch.setattr(
+            socket, "getaddrinfo", _fake_getaddrinfo("93.184.215.14")
+        )
+
     def test_rejects_download_that_exceeds_limit(
         self, monkeypatch, tmp_path
     ):
@@ -666,17 +691,17 @@ class TestDownloadAudioSafety:
 
         assert captured["cmd"][-1] == "youtu.be/abc123"
 
-    def test_does_not_dns_resolve_public_hostnames(self, monkeypatch, tmp_path):
+    def test_resolves_public_hostnames_before_yt_dlp(self, monkeypatch, tmp_path):
         import socket
 
         monkeypatch.setattr(tr, "_require", lambda binary: None)
-        monkeypatch.setattr(
-            socket,
-            "getaddrinfo",
-            lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("public hostnames should not be DNS-resolved here")
-            ),
-        )
+        resolved = []
+
+        def fake_getaddrinfo(host, port, *args, **kwargs):
+            resolved.append(host)
+            return _fake_getaddrinfo("142.250.80.46")(host, port)
+
+        monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
         captured = {}
 
         def fake_run(cmd, timeout=600):
@@ -687,7 +712,56 @@ class TestDownloadAudioSafety:
 
         tr.download_audio("https://youtu.be/abc123", tmp_path)
 
+        assert resolved == ["youtu.be"]
         assert captured["cmd"][-1] == "https://youtu.be/abc123"
+
+    @pytest.mark.parametrize(
+        "addresses",
+        [
+            ("127.0.0.1",),
+            ("10.0.0.5",),
+            ("169.254.169.254",),
+            ("93.184.215.14", "192.168.1.10"),  # any internal record blocks
+            ("::1",),
+            ("fe80::1",),
+            ("::ffff:127.0.0.1",),
+            ("224.0.0.1",),
+            ("240.0.0.1",),
+        ],
+    )
+    def test_rejects_hostname_resolving_to_internal_address(
+        self, monkeypatch, tmp_path, addresses
+    ):
+        import socket
+
+        monkeypatch.setattr(tr, "_require", lambda binary: None)
+        monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo(*addresses))
+
+        def should_not_run(*args, **kwargs):
+            raise AssertionError("yt-dlp must not run for internal resolutions")
+
+        monkeypatch.setattr(tr, "_run", should_not_run)
+
+        with pytest.raises(tr.TranscribeError, match="SSRF.*private/internal"):
+            tr.download_audio("https://rebind.example.com/a.mp3", tmp_path)
+
+    def test_unresolvable_hostname_fails_closed(self, monkeypatch, tmp_path):
+        import socket
+
+        monkeypatch.setattr(tr, "_require", lambda binary: None)
+
+        def fail(*args, **kwargs):
+            raise socket.gaierror("no such host")
+
+        monkeypatch.setattr(socket, "getaddrinfo", fail)
+        monkeypatch.setattr(
+            tr,
+            "_run",
+            lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not run")),
+        )
+
+        with pytest.raises(tr.TranscribeError, match="could not be resolved"):
+            tr.download_audio("https://nonexistent.invalid/a.mp3", tmp_path)
 
     # The C resolver behind yt-dlp accepts the full inet_aton grammar, so a
     # canonical dotted-quad check alone lets loopback and the cloud metadata
@@ -834,7 +908,7 @@ class TestMediaGenerationBudget:
 
 class TestSubprocessDecoding:
     # Non-ASCII input on purpose.
-    CJK_BYTES = "naïve café — ✓ título".encode("utf-8")
+    CJK_BYTES = "naïve café — ✓ título".encode()
 
     def _decoding_run(self, returncode: int):
         def fake_run(cmd, **kwargs):

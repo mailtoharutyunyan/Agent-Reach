@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Dedicated tests for Reddit's read-only multi-backend health check."""
 
 import json

@@ -2,6 +2,10 @@
 
 Xueqiu (Snowball) stock quotes, search, and trending content. Quotes may be delayed and do not constitute investment advice.
 
+> **Shell safety**: pass every URL/query from the user or from web content as ONE single-quoted
+> argument (`'...'`), never unquoted or interpolated. Reject input containing `$(`, a backtick,
+> a single quote, or a newline instead of running it.
+
 ## Check status first
 
 ```bash

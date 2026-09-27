@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 import os
 import re
@@ -8,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-import weblens.cli as cli
+from weblens.commands import install as install_cmd
 
 ROOT = Path(__file__).resolve().parents[1]
 TRANSCRIBE_SCRIPT = ROOT / "weblens" / "scripts" / "transcribe_xiaoyuzhou.sh"
@@ -23,14 +22,14 @@ def test_install_xiaoyuzhou_deps_does_not_raise_when_no_groq_key(
     monkeypatch, tmp_path, capsys
 ):
     monkeypatch.setattr(
-        cli.os.path,
+        install_cmd.os.path,
         "expanduser",
         lambda value: value.replace("~", str(tmp_path)),
     )
     with patch("weblens.config.Config", return_value=_DummyConfig()), patch(
         "shutil.which", return_value=None
     ):
-        cli._install_xiaoyuzhou_deps()
+        install_cmd._install_xiaoyuzhou_deps()
 
     out = capsys.readouterr().out
     assert "Xiaoyuzhou" in out
@@ -47,14 +46,14 @@ def test_install_xiaoyuzhou_deps_replaces_stale_managed_script(
     installed.write_text("#!/bin/sh\necho stale\n", encoding="utf-8")
 
     monkeypatch.setattr(
-        cli.os.path,
+        install_cmd.os.path,
         "expanduser",
         lambda value: value.replace("~", str(tmp_path)),
     )
     monkeypatch.setattr("weblens.config.Config", lambda: _DummyConfig())
     monkeypatch.setattr("shutil.which", lambda _name: None)
 
-    cli._install_xiaoyuzhou_deps()
+    install_cmd._install_xiaoyuzhou_deps()
 
     assert installed.read_text(encoding="utf-8") == TRANSCRIBE_SCRIPT.read_text(
         encoding="utf-8"
@@ -328,3 +327,83 @@ fi
     assert len(curl_calls) == 2
     assert all("api.groq.com" not in call for call in curl_calls)
     _assert_work_dir_cleaned(temp_root)
+
+
+def test_transcribe_script_keeps_groq_key_off_curl_argv_and_sanitizes_title(
+    tmp_path, bash_executable
+):
+    """The API key must travel via a 0600 header file, never curl's argv."""
+    env, curl_log, temp_root, bash_env = _script_env(
+        tmp_path,
+        """#!/bin/bash
+printf '%s\n' "$*" >> "$CURL_LOG"
+output=""
+header_file=""
+groq=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -o) output="$2"; shift 2 ;;
+        -H) case "$2" in @*) header_file="${2#@}" ;; esac; shift 2 ;;
+        https://api.groq.com/*) groq=1; shift ;;
+        *) shift ;;
+    esac
+done
+if [ "$groq" = "1" ]; then
+    cp "$header_file" "$HEADER_COPY"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        stat -f '%Lp' "$header_file" > "$HEADER_MODE"
+    else
+        stat -c '%a' "$header_file" > "$HEADER_MODE"
+    fi
+    printf 'transcribed text\n200'
+elif [ -n "$output" ]; then
+    printf 'fake audio' > "$output"
+else
+    printf '%s' "<html><script>\\"title\\":\\"Ep$(printf '\\033')[31mOne\\"</script>https://media.xyzcdn.net/test.mp3</html>"
+fi
+""",
+    )
+    _append_bash_function(bash_env, "ffprobe", "#!/bin/sh\nprintf '12.5'\n")
+    _append_bash_function(
+        bash_env,
+        "ffmpeg",
+        '#!/bin/bash\nfor last; do :; done\nprintf "mp3" > "$last"\n',
+    )
+    header_copy = tmp_path / "header-copy"
+    header_mode = tmp_path / "header-mode"
+    env["HEADER_COPY"] = _bash_path(header_copy)
+    env["HEADER_MODE"] = _bash_path(header_mode)
+    env["GROQ_API_KEY"] = "gsk_secret_value"
+    out_file = tmp_path / "out.txt"
+
+    result = subprocess.run(
+        [
+            bash_executable,
+            TRANSCRIBE_SCRIPT.relative_to(ROOT).as_posix(),
+            "https://www.xiaoyuzhoufm.com/episode/123",
+            _bash_path(out_file),
+        ],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        cwd=ROOT,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "gsk_secret_value" not in curl_log.read_text(encoding="utf-8")
+    assert header_copy.read_text(encoding="utf-8") == (
+        "Authorization: Bearer gsk_secret_value\n"
+    )
+    if os.name != "nt":
+        assert header_mode.read_text(encoding="utf-8").strip() == "600"
+    assert "\x1b" not in result.stdout
+    assert "Title: Ep[31mOne" in result.stdout
+    assert "transcribed text" in out_file.read_text(encoding="utf-8")
+    _assert_work_dir_cleaned(temp_root)
+
+
+def test_transcribe_script_uses_pipefail():
+    text = TRANSCRIBE_SCRIPT.read_text(encoding="utf-8")
+    assert "set -o pipefail" in text
+    assert "Authorization: Bearer $GROQ_API_KEY\"" not in text

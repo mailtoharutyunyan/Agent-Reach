@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Regression tests for P0 CLI safety and configuration failures."""
 
 from __future__ import annotations
@@ -13,6 +12,13 @@ from pathlib import Path
 import pytest
 
 import weblens.cli as cli
+from weblens.commands import configure as configure_cmd
+from weblens.commands import doctor as doctor_cmd
+from weblens.commands import install as install_cmd
+from weblens.commands import setup as setup_cmd
+from weblens.commands import skill as skill_cmd
+from weblens.commands import uninstall as uninstall_cmd
+from weblens.commands import update as update_cmd
 
 
 class _MemoryConfig:
@@ -103,7 +109,7 @@ def test_setup_uses_hidden_prompts_for_secrets(monkeypatch, capsys):
         lambda prompt: prompts.append(prompt) or next(secrets),
     )
 
-    cli._cmd_setup()
+    setup_cmd._cmd_setup()
 
     assert config.data["github_token"] == github_secret
     assert config.data["groq_api_key"] == groq_secret
@@ -145,7 +151,7 @@ def test_configure_rejects_stdin_combined_with_positional_value(
     monkeypatch, capsys
 ):
     monkeypatch.setattr(
-        cli,
+        configure_cmd,
         "_cmd_configure",
         lambda _args: pytest.fail("invalid input sources must not configure"),
     )
@@ -308,14 +314,14 @@ def test_install_does_not_implicitly_read_browser_cookies(monkeypatch, tmp_path,
 
     monkeypatch.setattr(config_module, "Config", _MemoryConfig)
     monkeypatch.setattr(
-        cli.os.path,
+        install_cmd.os.path,
         "expanduser",
         lambda value: value.replace("~", str(tmp_path)),
     )
-    monkeypatch.setattr(cli, "_install_system_deps", lambda: None)
-    monkeypatch.setattr(cli, "_install_mcporter", lambda: None)
-    monkeypatch.setattr(cli, "_install_twitter_deps", lambda: None)
-    monkeypatch.setattr(cli, "_install_skill", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_mcporter", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_twitter_deps", lambda: None)
+    monkeypatch.setattr(skill_cmd, "_install_skill", lambda: None)
     monkeypatch.setattr(
         "weblens.doctor.check_all",
         lambda _config: {},
@@ -330,7 +336,7 @@ def test_install_does_not_implicitly_read_browser_cookies(monkeypatch, tmp_path,
         lambda *_args, **_kwargs: pytest.fail("install must not read browser cookies"),
     )
 
-    cli._cmd_install(
+    install_cmd._cmd_install(
         Namespace(
             env="local",
             proxy="",
@@ -348,7 +354,7 @@ def test_install_does_not_implicitly_read_browser_cookies(monkeypatch, tmp_path,
 
 def test_install_rejects_safe_and_system_together(monkeypatch, capsys):
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_cmd_install",
         lambda _args: pytest.fail("conflicting install modes must not run"),
     )
@@ -380,12 +386,12 @@ def test_install_rejects_unknown_channel_before_side_effects(
         ),
     )
     monkeypatch.setattr(
-        cli,
+        install_cmd,
         "_install_system_deps",
         lambda: pytest.fail("system dependencies must not be installed"),
     )
     monkeypatch.setattr(
-        cli.os,
+        install_cmd.os,
         "makedirs",
         lambda *_args, **_kwargs: pytest.fail(
             "install directories must not be created"
@@ -412,9 +418,9 @@ def test_install_rejects_unknown_channel_before_side_effects(
 
 
 def test_install_accepts_boss_channel_in_dry_run(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "_install_system_deps_dryrun", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps_dryrun", lambda: None)
 
-    cli._cmd_install(
+    install_cmd._cmd_install(
         Namespace(
             env="local",
             proxy="",
@@ -429,9 +435,9 @@ def test_install_accepts_boss_channel_in_dry_run(monkeypatch, capsys):
 
 
 def test_install_all_includes_boss_on_desktop(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "_install_system_deps_dryrun", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps_dryrun", lambda: None)
 
-    cli._cmd_install(
+    install_cmd._cmd_install(
         Namespace(
             env="local",
             proxy="",
@@ -475,7 +481,7 @@ def test_manual_twitter_cookie_legacy_copies_are_opt_in(
         lambda auth, ct0: calls.append(("bird", auth, ct0)) or True,
     )
 
-    cli._cmd_configure(
+    configure_cmd._cmd_configure(
         Namespace(
             from_browser=None,
             key="twitter-cookies",
@@ -526,7 +532,7 @@ def test_legacy_twitter_sync_reports_only_confirmed_results(
         lambda *_args: bird_ok,
     )
 
-    cli._cmd_configure(
+    configure_cmd._cmd_configure(
         Namespace(
             from_browser=None,
             key="twitter-cookies",
@@ -557,7 +563,7 @@ def test_twitter_configure_never_runs_upstream_browser_fallback(
         ),
     )
 
-    cli._cmd_configure(
+    configure_cmd._cmd_configure(
         Namespace(
             from_browser=None,
             key="twitter-cookies",
@@ -580,12 +586,12 @@ def test_doctor_never_installs_or_updates_skill(monkeypatch, capsys):
     monkeypatch.setattr("weblens.doctor.check_all", lambda _config: {})
     monkeypatch.setattr("weblens.doctor.format_report", lambda _results: "report")
     monkeypatch.setattr(
-        cli,
+        skill_cmd,
         "_install_skill",
         lambda *_args, **_kwargs: pytest.fail("doctor must not install skill"),
     )
 
-    cli._cmd_doctor(Namespace(json=False))
+    doctor_cmd._cmd_doctor(Namespace(json=False))
 
     assert "report" in capsys.readouterr().out
 
@@ -623,12 +629,12 @@ def test_watch_uses_read_only_config(monkeypatch, capsys):
         },
     )
     monkeypatch.setattr(
-        cli,
+        update_cmd,
         "_github_get_with_retry",
         lambda *_args, **_kwargs: (_Release(), None, 1),
     )
 
-    cli._cmd_watch()
+    update_cmd._cmd_watch()
 
     assert len(created) == 1
     assert created[0].read_only is True
@@ -661,7 +667,7 @@ def test_xhs_docker_cookie_copy_succeeds_without_local_os_binding_error(
     monkeypatch.setattr("shutil.which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._configure_xhs_cookies("web_session=xhs_secret")
+    configure_cmd._configure_xhs_cookies("web_session=xhs_secret")
 
     output = capsys.readouterr().out
     assert "Cookies written to xiaohongshu-mcp:/app/data/cookies.json" in output
@@ -691,7 +697,7 @@ def test_xhs_docker_cookie_copy_always_removes_temporary_file(monkeypatch, capsy
     monkeypatch.setattr("shutil.which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._configure_xhs_cookies("web_session=xhs_secret")
+    configure_cmd._configure_xhs_cookies("web_session=xhs_secret")
 
     assert copied_from
     assert not Path(copied_from[0]).exists()
@@ -720,7 +726,7 @@ def test_xhs_docker_restart_failure_returns_failure(monkeypatch, capsys):
     monkeypatch.setattr("shutil.which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    result = cli._configure_xhs_cookies("web_session=xhs_secret")
+    result = configure_cmd._configure_xhs_cookies("web_session=xhs_secret")
 
     output = capsys.readouterr().out
     assert result is False
@@ -741,7 +747,7 @@ def test_system_install_uses_ytdlp_first_user_config(
     monkeypatch.setattr(paths.Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.delenv("XDG_CONFIG_HOME")
     monkeypatch.setattr(
-        cli.os.path,
+        install_cmd.os.path,
         "expanduser",
         lambda value: str(tmp_path / ".legacy-config")
         if value == "~/.config/yt-dlp"
@@ -767,7 +773,7 @@ def test_system_install_uses_ytdlp_first_user_config(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     config_path = tmp_path / ".config" / "yt-dlp" / "config"
     assert config_path.read_text(encoding="utf-8") == "--js-runtimes node\n"
@@ -807,7 +813,7 @@ def test_system_install_uses_existing_apt_without_remote_bootstrap(
     monkeypatch.setattr(builtins, "open", fake_open)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     assert commands == [
         ["/usr/bin/apt-get", "update", "-qq"],
@@ -843,7 +849,7 @@ def test_system_install_stops_after_failed_apt_update(monkeypatch, capsys):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     assert commands == [["/usr/bin/apt-get", "update", "-qq"]]
     output = capsys.readouterr().out
@@ -876,7 +882,7 @@ def test_system_install_uses_brew_and_checks_each_result(monkeypatch, capsys):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     assert commands == [
         ["/opt/homebrew/bin/brew", "install", "gh"],
@@ -893,6 +899,8 @@ def test_system_install_stops_undici_setup_when_npm_root_fails(
 ):
     """A failed discovery step must not trigger a global npm write."""
     import shutil
+
+    monkeypatch.setattr(install_cmd, "_proxy_configured", lambda: True)
 
     commands = []
     monkeypatch.setattr(
@@ -914,7 +922,7 @@ def test_system_install_stops_undici_setup_when_npm_root_fails(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     assert commands == [["/usr/bin/npm", "root", "-g"]]
     output = capsys.readouterr().out
@@ -926,6 +934,8 @@ def test_system_install_does_not_report_failed_undici_as_success(
     monkeypatch, capsys
 ):
     import shutil
+
+    monkeypatch.setattr(install_cmd, "_proxy_configured", lambda: True)
 
     monkeypatch.setattr(
         shutil,
@@ -952,11 +962,99 @@ def test_system_install_does_not_report_failed_undici_as_success(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     output = capsys.readouterr().out
     assert "✅ undici installed" not in output
     assert "undici install failed" in output
+
+
+def test_system_install_pins_undici_when_proxy_configured(monkeypatch):
+    import shutil
+
+    monkeypatch.setattr(install_cmd, "_proxy_configured", lambda: True)
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}"
+        if name in {"gh", "node", "npm", "deno"}
+        else None,
+    )
+    commands = []
+
+    def fake_run(args, **_kwargs):
+        commands.append(args)
+        if args[1:3] == ["root", "-g"]:
+            return subprocess.CompletedProcess(args, 0, "/missing/root\n", "")
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    install_cmd._install_system_deps()
+
+    assert ["/usr/bin/npm", "install", "-g", "undici@8.11.2"] in commands
+    assert ["/usr/bin/npm", "install", "-g", "undici"] not in commands
+
+
+def test_system_install_skips_undici_without_proxy(monkeypatch, capsys):
+    import shutil
+
+    for name in install_cmd._PROXY_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+    class _NoProxyConfig:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get(self, key, default=None):
+            return default
+
+    monkeypatch.setattr("weblens.config.Config", _NoProxyConfig)
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}"
+        if name in {"gh", "node", "npm", "deno"}
+        else None,
+    )
+    commands = []
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda args, **_kwargs: commands.append(args)
+        or subprocess.CompletedProcess(args, 0, "", ""),
+    )
+
+    install_cmd._install_system_deps()
+
+    assert not any("npm" in str(cmd[0]) for cmd in commands)
+    assert "skipping optional undici install" in capsys.readouterr().out
+
+
+def test_proxy_configured_detects_env(monkeypatch):
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:8080")
+    assert install_cmd._proxy_configured() is True
+
+
+def test_optional_cli_installs_are_version_pinned(monkeypatch):
+    import shutil
+
+    commands = []
+    monkeypatch.setattr(
+        shutil, "which", lambda name: "/usr/bin/pipx" if name == "pipx" else None
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda args, **_kwargs: commands.append(args)
+        or subprocess.CompletedProcess(args, 1, "", ""),
+    )
+
+    install_cmd._install_twitter_deps()
+    install_cmd._install_bili_deps()
+
+    assert ["/usr/bin/pipx", "install", "twitter-cli==0.8.5"] in commands
+    assert ["/usr/bin/pipx", "install", "bilibili-cli==0.6.2"] in commands
 
 
 def test_install_dry_run_never_suggests_remote_setup_scripts(
@@ -966,7 +1064,7 @@ def test_install_dry_run_never_suggests_remote_setup_scripts(
 
     monkeypatch.setattr(shutil, "which", lambda _name: None)
 
-    cli._install_system_deps_dryrun()
+    install_cmd._install_system_deps_dryrun()
 
     output = capsys.readouterr().out
     assert "curl" not in output
@@ -977,7 +1075,7 @@ def test_install_dry_run_never_suggests_remote_setup_scripts(
 
 @pytest.mark.parametrize(
     "helper",
-    [cli._install_system_deps_safe, cli._install_system_deps_dryrun],
+    [install_cmd._install_system_deps_safe, install_cmd._install_system_deps_dryrun],
 )
 def test_system_dependency_checks_require_both_node_and_npm(
     monkeypatch, capsys, helper
@@ -1034,7 +1132,7 @@ def test_system_install_never_writes_unsupported_ytdlp_flag(
     monkeypatch.setattr(shutil, "which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_system_deps()
+    install_cmd._install_system_deps()
 
     config_path = tmp_path / ".config" / "yt-dlp" / "config"
     assert not config_path.exists()
@@ -1073,7 +1171,7 @@ def test_mcporter_install_adds_exa_to_home_scope(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_mcporter()
+    install_cmd._install_mcporter()
 
     assert [
         "/usr/bin/mcporter",
@@ -1119,7 +1217,7 @@ def test_mcporter_install_does_not_treat_metadata_as_exa_server(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._install_mcporter()
+    install_cmd._install_mcporter()
 
     assert [
         "/usr/bin/mcporter",
@@ -1150,7 +1248,7 @@ def test_mcporter_install_uses_resolved_windows_command_paths(monkeypatch):
 
     def fake_run(args, **_kwargs):
         calls.append(args)
-        if args[:4] == [npm_cmd, "install", "-g", "mcporter"]:
+        if args[:4] == [npm_cmd, "install", "-g", "mcporter@0.14.1"]:
             state["installed"] = True
             return _docker_result(args)
         if args == [mcporter_cmd, "config", "list", "--json"]:
@@ -1163,9 +1261,9 @@ def test_mcporter_install_uses_resolved_windows_command_paths(monkeypatch):
     monkeypatch.setattr(shutil, "which", fake_which)
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    assert cli._install_mcporter() is True
+    assert install_cmd._install_mcporter() is True
     assert calls == [
-        [npm_cmd, "install", "-g", "mcporter"],
+        [npm_cmd, "install", "-g", install_cmd._MCPORTER_NPM_SPEC],
         [mcporter_cmd, "config", "list", "--json"],
     ]
 
@@ -1174,9 +1272,9 @@ def test_server_xhs_install_never_recommends_qr_or_browser_extraction(
     monkeypatch, capsys
 ):
     """Project policy requires an explicit Cookie-Editor export for XHS."""
-    monkeypatch.setattr(cli, "_detect_environment", lambda: "server")
+    monkeypatch.setattr(install_cmd, "_detect_environment", lambda: "server")
 
-    cli._install_xhs_deps()
+    install_cmd._install_xhs_deps()
 
     output = capsys.readouterr().out
     assert "Cookie-Editor" in output
@@ -1188,7 +1286,7 @@ def test_server_xhs_install_never_recommends_qr_or_browser_extraction(
 def test_configure_usage_does_not_recommend_blocked_twitter_browser_import(
     capsys,
 ):
-    cli._cmd_configure(
+    configure_cmd._cmd_configure(
         Namespace(
             from_browser=None,
             key=None,
@@ -1296,7 +1394,7 @@ def test_missing_profile_is_clean_cli_error_without_traceback(
     )
 
     with pytest.raises(SystemExit) as exc:
-        cli._cmd_configure(
+        configure_cmd._cmd_configure(
             Namespace(
                 from_browser="chrome",
                 platform="xueqiu",
@@ -1318,9 +1416,9 @@ def test_missing_profile_is_clean_cli_error_without_traceback(
 def test_install_dry_run_does_not_create_weblens_directory(
     isolated_home, monkeypatch
 ):
-    monkeypatch.setattr(cli, "_install_system_deps_dryrun", lambda: None)
+    monkeypatch.setattr(install_cmd, "_install_system_deps_dryrun", lambda: None)
 
-    cli._cmd_install(
+    install_cmd._cmd_install(
         Namespace(
             env="local",
             proxy="",
@@ -1344,7 +1442,7 @@ def test_uninstall_warns_about_opt_in_legacy_credential_copies(
     xfetch.write_text("{}", encoding="utf-8")
     bird.write_text("AUTH_TOKEN=secret\n", encoding="utf-8")
 
-    cli._cmd_uninstall(Namespace(dry_run=True, keep_config=False))
+    uninstall_cmd._cmd_uninstall(Namespace(dry_run=True, keep_config=False))
 
     output = capsys.readouterr().out
     assert str(xfetch) in output
@@ -1391,7 +1489,7 @@ def test_uninstall_preserves_mcporter_entries_without_weblens_provenance(
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    cli._cmd_uninstall(Namespace(dry_run=False, keep_config=True))
+    uninstall_cmd._cmd_uninstall(Namespace(dry_run=False, keep_config=True))
 
     output = capsys.readouterr().out
     assert not any("remove" in call for call in calls)

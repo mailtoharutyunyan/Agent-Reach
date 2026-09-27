@@ -2,14 +2,18 @@
 
 import pytest
 
+from weblens.channels.arxiv import ArxivChannel
 from weblens.channels.bilibili import BilibiliChannel
 from weblens.channels.facebook import FacebookChannel
 from weblens.channels.github import GitHubChannel
+from weblens.channels.hackernews import HackerNewsChannel
 from weblens.channels.instagram import InstagramChannel
 from weblens.channels.linkedin import LinkedInChannel
 from weblens.channels.reddit import RedditChannel
+from weblens.channels.stackoverflow import StackOverflowChannel
 from weblens.channels.twitter import TwitterChannel
 from weblens.channels.v2ex import V2EXChannel
+from weblens.channels.wikipedia import WikipediaChannel
 from weblens.channels.xiaohongshu import XiaoHongShuChannel
 from weblens.channels.xiaoyuzhou import XiaoyuzhouChannel
 from weblens.channels.xueqiu import XueqiuChannel
@@ -96,6 +100,26 @@ def test_credential_channels_reject_lookalikes_and_userinfo(channel, malicious_u
             "https://www.instagram.com/example",
             "https://instagram.com:443/example",
         ),
+        (
+            HackerNewsChannel(),
+            "https://news.ycombinator.com/item?id=1",
+            "https://news.ycombinator.com:443/item?id=1",
+        ),
+        (
+            StackOverflowChannel(),
+            "https://unix.stackexchange.com/q/1",
+            "https://stackoverflow.com:443/questions/1",
+        ),
+        (
+            WikipediaChannel(),
+            "https://en.m.wikipedia.org/wiki/X",
+            "https://en.wikipedia.org:443/wiki/X",
+        ),
+        (
+            ArxivChannel(),
+            "https://export.arxiv.org/abs/1706.03762",
+            "https://arxiv.org:443/abs/1706.03762",
+        ),
     ],
 )
 def test_fixed_domain_channels_accept_subdomains_and_explicit_ports(
@@ -116,6 +140,10 @@ def test_fixed_domain_channels_accept_subdomains_and_explicit_ports(
         (XiaoyuzhouChannel(), "xiaoyuzhoufm.com"),
         (FacebookChannel(), "facebook.com"),
         (InstagramChannel(), "instagram.com"),
+        (HackerNewsChannel(), "news.ycombinator.com"),
+        (StackOverflowChannel(), "stackoverflow.com"),
+        (WikipediaChannel(), "wikipedia.org"),
+        (ArxivChannel(), "arxiv.org"),
     ],
 )
 def test_fixed_domain_channels_reject_suffix_lookalikes_and_userinfo(

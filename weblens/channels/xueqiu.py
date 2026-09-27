@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Xueqiu (Snowball) — stock quotes, search, trending posts & hot stocks."""
 
 import http.cookiejar

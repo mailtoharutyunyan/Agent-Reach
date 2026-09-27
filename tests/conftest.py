@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Suite-wide containment for tests that exercise user-facing installers."""
 
 import os
@@ -97,3 +96,27 @@ def isolated_xueqiu_cookie_jar(monkeypatch):
     monkeypatch.setattr(xueqiu, "_cookies_initialized", False)
     yield
     xueqiu._cookie_jar.clear()
+
+
+@pytest.fixture(autouse=True)
+def no_retry_sleep(monkeypatch):
+    """Retry backoff must never really sleep in tests; record requested delays."""
+    from weblens.channels import _http
+
+    delays: list[float] = []
+    monkeypatch.setattr(_http, "_sleep", delays.append)
+    return delays
+
+
+@pytest.fixture(autouse=True)
+def no_feed_sniff(monkeypatch):
+    """`weblens read` sniffs unclaimed URLs for feeds; never hit the network in tests.
+
+    Tests covering the sniff patch ``weblens.unified.read._sniff_feed`` (or the
+    lower-level ``_http`` openers) themselves.
+    """
+    from weblens.unified import read as unified_read
+
+    real = unified_read._sniff_feed
+    monkeypatch.setattr(unified_read, "_sniff_feed", lambda url: None)
+    return real

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for doctor module."""
 
 import hashlib
@@ -227,8 +226,7 @@ def test_real_doctor_path_is_zero_write_and_never_runs_risky_status_commands(
     import weblens.channels.v2ex as v2ex
     import weblens.channels.xiaohongshu as xiaohongshu
     import weblens.channels.xueqiu as xueqiu
-    from weblens import cli
-
+    from weblens.commands import doctor as doctor_cmd
     workdir = tmp_path / "empty-workdir"
     workdir.mkdir()
     monkeypatch.chdir(workdir)
@@ -305,7 +303,7 @@ def test_real_doctor_path_is_zero_write_and_never_runs_risky_status_commands(
     )
 
     before = _snapshot_user_roots()
-    cli._cmd_doctor(Namespace(json=True))
+    doctor_cmd._cmd_doctor(Namespace(json=True))
     after = _snapshot_user_roots()
 
     assert after == before

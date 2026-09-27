@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Xiaoyuzhou Podcast (podcast app) — transcribe podcasts via Groq Whisper API."""
 
 import os

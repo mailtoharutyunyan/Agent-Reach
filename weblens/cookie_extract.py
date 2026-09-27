@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Least-privilege cookie extraction from local browsers.
 
 Supports: Chrome, Firefox, Edge, Brave, Opera
@@ -8,9 +7,10 @@ Usage:
     weblens configure --from-browser chrome --platform xueqiu
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple, TypedDict
+from typing import TypedDict
 
 from weblens.utils.text import scrub_url_credentials
 from weblens.utils.url import domain_matches
@@ -18,18 +18,18 @@ from weblens.utils.url import domain_matches
 
 class PlatformSpec(TypedDict):
     name: str
-    domains: Tuple[str, ...]
-    cookies: Optional[Tuple[str, ...]]
+    domains: tuple[str, ...]
+    cookies: tuple[str, ...] | None
     config_key: str
 
 
 class ChromiumPaths(TypedDict):
     darwin: str
     linux: str
-    win32: Tuple[str, ...]
+    win32: tuple[str, ...]
 
 
-PLATFORM_SPECS: Tuple[PlatformSpec, ...] = (
+PLATFORM_SPECS: tuple[PlatformSpec, ...] = (
     {
         "name": "Twitter/X",
         "domains": (".x.com", ".twitter.com"),
@@ -56,7 +56,7 @@ PLATFORM_SPECS: Tuple[PlatformSpec, ...] = (
     },
 )
 
-_PLATFORM_SPECS_BY_KEY: Dict[str, PlatformSpec] = {
+_PLATFORM_SPECS_BY_KEY: dict[str, PlatformSpec] = {
     spec["config_key"]: spec for spec in PLATFORM_SPECS
 }
 SUPPORTED_BROWSERS = ("chrome", "firefox", "edge", "brave", "opera")
@@ -67,7 +67,7 @@ _COOKIE_EDITOR_ONLY = {
     "xhs": "xhs-cookies",
 }
 
-_CHROMIUM_USER_DATA_DIRS: Dict[str, ChromiumPaths] = {
+_CHROMIUM_USER_DATA_DIRS: dict[str, ChromiumPaths] = {
     "chrome": {
         "darwin": "~/Library/Application Support/Google/Chrome",
         "linux": "~/.config/google-chrome",
@@ -93,7 +93,7 @@ class BrowserConfigResult:
     platform: str
     success: bool
     message: str
-    targets: Tuple[str, ...] = ()
+    targets: tuple[str, ...] = ()
 
     def __iter__(self) -> Iterator[object]:
         """Preserve the historical three-value unpacking API."""
@@ -102,7 +102,7 @@ class BrowserConfigResult:
         yield self.message
 
 
-def _chromium_user_data_dir(browser: str) -> Optional[Path]:
+def _chromium_user_data_dir(browser: str) -> Path | None:
     """Return the browser's profile root on the current operating system."""
     import os
     import sys
@@ -119,7 +119,7 @@ def _chromium_user_data_dir(browser: str) -> Optional[Path]:
     return Path(os.path.expanduser(path))
 
 
-def list_browser_profiles(browser: str = "chrome") -> List[Dict[str, str]]:
+def list_browser_profiles(browser: str = "chrome") -> list[dict[str, str]]:
     """List named Chromium profiles that contain a cookie database."""
     browser = browser.lower()
     root = _chromium_user_data_dir(browser)
@@ -178,7 +178,7 @@ def _profile_cookie_file(browser: str, profile: str) -> str:
     )
 
 
-def _platform_spec(platform: Optional[str]) -> PlatformSpec:
+def _platform_spec(platform: str | None) -> PlatformSpec:
     """Return the one explicitly requested platform specification."""
     if not platform:
         raise ValueError(
@@ -209,9 +209,9 @@ def _require_browser_extractable(spec: PlatformSpec) -> None:
 def extract_all(
     browser: str = "chrome",
     *,
-    platform: Optional[str] = None,
-    profile: Optional[str] = None,
-) -> Dict[str, dict]:
+    platform: str | None = None,
+    profile: str | None = None,
+) -> dict[str, dict]:
     """
     Extract cookies for one explicitly requested platform.
 
@@ -257,7 +257,7 @@ def extract_all(
                 f"Cookie extraction{profile_hint} requires browser_cookie3"
                 " (or rookiepy when no profile is selected).\n"
                 "Install: pip install browser-cookie3"
-            )
+            ) from None
 
     if use_rookiepy:
         # rookiepy returns list of dicts with name/value/domain/path keys
@@ -282,7 +282,7 @@ def extract_all(
                 f"Could not read {browser} cookies via rookiepy: "
                 f"{scrub_url_credentials(e)}\n"
                 f"Make sure {browser} is closed and you have permission."
-            )
+            ) from None
     else:
         browser_funcs = {
             "chrome": browser_cookie3.chrome,
@@ -312,7 +312,7 @@ def extract_all(
             raise RuntimeError(
                 f"Could not read {browser} cookies: {scrub_url_credentials(e)}\n"
                 f"Make sure {browser} is closed and you have permission."
-            )
+            ) from None
 
     results = {}
 
@@ -415,9 +415,9 @@ def configure_from_browser(
     browser: str,
     config,
     *,
-    platform: Optional[str] = None,
-    profile: Optional[str] = None,
-) -> List[BrowserConfigResult]:
+    platform: str | None = None,
+    profile: str | None = None,
+) -> list[BrowserConfigResult]:
     """
     Extract and configure exactly one explicitly selected platform.
 
@@ -427,7 +427,7 @@ def configure_from_browser(
     """
     spec = _platform_spec(platform)
     _require_browser_extractable(spec)
-    results_list: List[BrowserConfigResult] = []
+    results_list: list[BrowserConfigResult] = []
 
     try:
         extracted = extract_all(

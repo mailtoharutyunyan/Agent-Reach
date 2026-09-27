@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """Web — any URL via Jina Reader. Always available."""
 
 import urllib.request
 
 from weblens.utils.url import normalize_public_http_url
 
+from . import _http
 from .base import Channel
 
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -53,8 +53,13 @@ class WebChannel(Channel):
             jina_url,
             headers={"User-Agent": _UA, "Accept": "text/plain"},
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            body = resp.read(_MAX_RESPONSE_BYTES + 1)
+
+        def _fetch() -> bytes:
+            with _http.urlopen(req, timeout=30) as resp:  # honors the saved proxy
+                return resp.read(_MAX_RESPONSE_BYTES + 1)
+
+        # Jina rate-limits (429) and has transient gateway errors: bounded retry.
+        body = _http.call_with_retries(_fetch)
         if len(body) > _MAX_RESPONSE_BYTES:
             raise ValueError(
                 f"Jina Reader response exceeds {_MAX_RESPONSE_BYTES} byte limit"

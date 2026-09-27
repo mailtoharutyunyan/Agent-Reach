@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """YouTube — check if yt-dlp is available with JS runtime."""
 
 import re

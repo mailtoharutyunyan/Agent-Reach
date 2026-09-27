@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Exa Search — check if mcporter + Exa MCP is available."""
 
 import shutil

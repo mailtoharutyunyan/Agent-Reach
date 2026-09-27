@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for channel registry basics and health checks."""
 
 import json
@@ -36,6 +35,8 @@ class TestChannelRegistry:
         assert "facebook" in names
         assert "instagram" in names
         assert "v2ex" in names
+        for name in ("hackernews", "stackoverflow", "wikipedia", "arxiv"):
+            assert name in names
 
 
 class TestOpenCLISiteChannels:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Behavior tests for cross-platform path and remediation helpers."""
 
 import shutil
